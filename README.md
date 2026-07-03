@@ -157,7 +157,3 @@ Mosaic stands on work that came before it:
 The scope and core design are kept tight while they take shape.
 You're welcome to read, open an issue to discuss the design, or file a bug.
 See [CONTRIBUTING.md](.github/CONTRIBUTING.md).
-
-## License
-
-[MIT](LICENSE).
