@@ -11,6 +11,8 @@ Mosaic is a format that lets the agent build that picture from general blocks, a
 [![Proposal](https://img.shields.io/badge/proposal-founding-7c7cff.svg)](docs/proposal.md)
 [![mosaic_version](https://img.shields.io/badge/mosaic__version-1.0--draft-7c7cff.svg)](docs/proposal.md)
 [![Discussion](https://img.shields.io/badge/discuss-issues-blue.svg)](https://github.com/ruwadgroup/mosaic/issues)
+[![GitHub stars](https://img.shields.io/github/stars/ruwadgroup/mosaic?style=flat&logo=github&label=star)](https://github.com/ruwadgroup/mosaic)
+[![Follow @TamimBinHakim](https://img.shields.io/badge/follow-%40TamimBinHakim-000000?logo=x&logoColor=white)](https://x.com/TamimBinHakim)
 
 </div>
 
@@ -164,6 +166,11 @@ If you'd rather read than run, [`examples/`](examples) has the hand-written file
 - **[Model Context Protocol](https://modelcontextprotocol.io)**, one of the tool transports that carry Mosaic's introspection tools to a model.
 - **[safe-mdx](https://github.com/remorses/safe-mdx)**, which showed JSX-shaped input can be treated as plain data.
 - **[CEL](https://github.com/google/cel-spec)** and spreadsheet formulas, the model behind a safe, bounded `expr`.
+
+## Community
+
+If Mosaic is useful to you, [**star the repo**](https://github.com/ruwadgroup/mosaic) - it helps others find it, and it tells me to keep building.
+Follow [**@TamimBinHakim**](https://x.com/TamimBinHakim) on X for updates, and open a [discussion](https://github.com/ruwadgroup/mosaic/discussions) to talk through the design.
 
 ## Contributing
 
