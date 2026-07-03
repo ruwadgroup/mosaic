@@ -4,6 +4,7 @@
 // values recompute, a conditional flips, and a button hands the host a
 // computed intent.
 
+import { DEFAULT_MANIFEST } from '@mosaic/core';
 import { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -192,5 +193,164 @@ describe('the reactive loop in a DOM', () => {
 
     expect(container.textContent).toContain('details');
     expect(intents).toEqual([]); // local mutation never left the artifact
+  });
+
+  it('for:each index binding drives per-row record state and re-derives labels', async () => {
+    await act(async () => {
+      root.render(
+        render(`
+          <Card gap="2" state={{ files: [
+            { path: "src/atoms.ts", checked: true },
+            { path: "src/effect.ts", checked: true },
+            { path: "src/store.ts", checked: false }
+          ] }}>
+            <Stack for:each="files as f, i">
+              <Checkbox bind:state="files[i].checked" label={expr("f.path")} />
+            </Stack>
+            <Text>{expr("concat('Commit ', sum(map(files, f, f.checked ? 1 : 0)), ' files')")}</Text>
+          </Card>`),
+      );
+    });
+    expect(container.textContent).toContain('Commit 2 files');
+
+    const boxes = [...container.querySelectorAll('input[type="checkbox"]')] as HTMLInputElement[];
+    expect(boxes).toHaveLength(3);
+    expect(boxes.map((b) => b.checked)).toEqual([true, true, false]);
+
+    await act(async () => {
+      (boxes[0] as HTMLInputElement).click();
+    });
+    expect(container.textContent).toContain('Commit 1 files');
+
+    await act(async () => {
+      const fresh = [...container.querySelectorAll('input[type="checkbox"]')];
+      (fresh[2] as HTMLInputElement).click();
+    });
+    expect(container.textContent).toContain('Commit 2 files');
+  });
+
+  it("state.set accepts a path ('data.view')", async () => {
+    await act(async () => {
+      root.render(
+        render(`
+          <Stack state={{ data: { view: "list" } }}>
+            <Button on:event={{ click: "state.set('data.view', 'grid')" }}>Grid</Button>
+            <Text if:show="data.view == 'grid'">grid-active</Text>
+          </Stack>`),
+      );
+    });
+    expect(container.textContent).not.toContain('grid-active');
+
+    const button = container.querySelector('button') as HTMLButtonElement;
+    await act(async () => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('grid-active');
+  });
+});
+
+const DIAGRAM_MANIFEST = {
+  ...DEFAULT_MANIFEST,
+  components_supported: [...DEFAULT_MANIFEST.components_supported, 'Diagram'],
+};
+
+const REQUEST_PATH = `
+<Stack gap="3" state={{ selected: null }}>
+  <Diagram alt="request path" bind:state="selected"
+    on:event={{ select: { action: "openNode", args: { origin: "diagram" } } }}
+    nodes={[
+      { id: "edge", label: "Edge" },
+      { id: "auth", label: "Auth", group: "services" },
+      { id: "api", label: "API", group: "services" }
+    ]}
+    edges={[{ from: "edge", to: "auth" }, { from: "edge", to: "api" }]}
+    groups={[{ id: "services", label: "Services" }]} />
+  <Card if:show="selected == 'edge'"><Text>edge-panel</Text></Card>
+  <Card if:show="selected == 'auth'"><Text>auth-panel</Text></Card>
+</Stack>`;
+
+describe('the Diagram block in a DOM', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it('node click writes the bound selection and swaps the detail panel', async () => {
+    await act(async () => {
+      root.render(render(REQUEST_PATH, { manifest: DIAGRAM_MANIFEST }));
+    });
+    expect(container.querySelector('svg[role="img"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('edge-panel');
+    expect(container.textContent).not.toContain('auth-panel');
+
+    const auth = container.querySelector('[data-node-id="auth"]') as SVGGElement;
+    await act(async () => {
+      auth.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('auth-panel');
+    expect(container.textContent).not.toContain('edge-panel');
+    // the selection ring moved to the clicked node
+    const ring = container.querySelector('[data-node-id="auth"] rect') as SVGRectElement;
+    expect(ring.getAttribute('stroke-width')).toBe('2');
+
+    const edge = container.querySelector('[data-node-id="edge"]') as SVGGElement;
+    await act(async () => {
+      edge.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('edge-panel');
+    expect(container.textContent).not.toContain('auth-panel');
+
+    const bg = container.querySelector('[data-diagram-bg]') as SVGRectElement;
+    await act(async () => {
+      bg.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).not.toContain('edge-panel');
+    expect(container.textContent).not.toContain('auth-panel');
+  });
+
+  it('an authored select intent reaches the host with the clicked id merged in', async () => {
+    const intents: Array<{ action: string; args?: unknown }> = [];
+    await act(async () => {
+      root.render(
+        render(REQUEST_PATH, {
+          manifest: DIAGRAM_MANIFEST,
+          onAction: (action, args) => void intents.push({ action, args }),
+        }),
+      );
+    });
+
+    const api = container.querySelector('[data-node-id="api"]') as SVGGElement;
+    await act(async () => {
+      api.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(intents).toEqual([{ action: 'openNode', args: { origin: 'diagram', id: 'api' } }]);
+    expect(container.textContent).not.toContain('edge-panel'); // selection stayed local
+  });
+
+  it('renders statically when the manifest is non-interactive', async () => {
+    const intents: string[] = [];
+    await act(async () => {
+      root.render(
+        render(REQUEST_PATH, {
+          manifest: { ...DIAGRAM_MANIFEST, interactive: false },
+          onAction: (action) => void intents.push(action),
+        }),
+      );
+    });
+    const auth = container.querySelector('[data-node-id="auth"]') as SVGGElement;
+    expect(auth.getAttribute('style')).toBeNull(); // no pointer cursor
+    await act(async () => {
+      auth.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(intents).toEqual([]); // no handler fired: the diagram is static
   });
 });

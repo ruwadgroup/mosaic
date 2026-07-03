@@ -1,4 +1,4 @@
-// @mosaic/react — the reference web renderer.
+// @mosaic/react - the reference web renderer.
 //
 // render() is parse -> validate -> resolve -> a React subtree from a registry
 // of reference blocks. State lives in one React store; every state change
@@ -11,6 +11,7 @@ import {
   type ActionRef,
   DEFAULT_MANIFEST,
   DEFAULT_THEME,
+  type ExprValue,
   type HostManifest,
   JsxError,
   type MosaicDocument,
@@ -24,11 +25,22 @@ import {
   isExprRef,
   isTokenRef,
   parse,
+  readStatePath,
   resolve,
   resolveToken,
   validate,
+  writeStatePath,
 } from '@mosaic/core';
 import * as React from 'react';
+import { layoutDiagram } from './diagram-layout.js';
+
+export { layoutDiagram } from './diagram-layout.js';
+export type {
+  DiagramLayout,
+  DiagramLayoutEdge,
+  DiagramLayoutInput,
+  DiagramLayoutRect,
+} from './diagram-layout.js';
 
 export type OnAction = (action: string, args?: unknown) => void | Promise<void>;
 
@@ -73,7 +85,7 @@ export type MosaicBlockProps = {
 export type MosaicComponents = Record<string, React.ComponentType<MosaicBlockProps>>;
 
 /** The rich components this renderer draws natively; the rest decompose. */
-const NATIVE_RICH = new Set(['DataTable', 'List', 'Timeline', 'Stat', 'Chart', 'Steps']);
+const NATIVE_RICH = new Set(['DataTable', 'List', 'Timeline', 'Stat', 'Chart', 'Steps', 'Diagram']);
 
 // --- local state mutations ------------------------------------------------------
 
@@ -111,8 +123,11 @@ function MosaicArtifact({
 }: ArtifactProps): React.ReactElement {
   const [state, setState] = React.useState<StateScope>(() => initialState(doc));
 
+  // The single write choke point: keys are state paths ("eggs",
+  // "files[2].checked"), already concrete on resolved nodes. Copy-on-write via
+  // writeStatePath keeps initialState's shared references intact.
   const setKey = React.useCallback((key: string, value: unknown) => {
-    setState((s) => ({ ...s, [key]: value as StateScope[string] }));
+    setState((s) => writeStatePath(s, key, value as ExprValue));
   }, []);
 
   const dispatch = React.useCallback<Dispatch>(
@@ -125,8 +140,8 @@ function MosaicArtifact({
         }
         const toggle = TOGGLE_RE.exec(action);
         if (toggle) {
-          const key = toggle[1] as string;
-          setState((s) => ({ ...s, [key]: !s[key] }));
+          const path = toggle[1] as string;
+          setState((s) => writeStatePath(s, path, !readStatePath(s, path)));
           return;
         }
         void onAction?.(action, resolvedArgs);
@@ -213,8 +228,12 @@ function useBindable<T>(
 ): [T, (v: T) => void] {
   const [local, setLocal] = React.useState<T>(fallback);
   if (bind) {
-    const bound = ctx.state[bind];
-    return [bound === undefined ? fallback : (bound as T), (v: T) => ctx.setKey(bind, v)];
+    // bind is the concrete path the resolver produced ("files[2].checked").
+    const bound = readStatePath(ctx.state, bind);
+    return [
+      bound === undefined || bound === null ? fallback : (bound as T),
+      (v: T) => ctx.setKey(bind, v),
+    ];
   }
   return [local, setLocal];
 }
@@ -662,6 +681,288 @@ function SwitchBlock({ node, ctx }: BlockProps): React.ReactElement {
   );
 }
 
+// --- the Diagram reference block ------------------------------------------------------
+// Declarative nodes/edges/groups drawn as SVG over layoutDiagram()'s geometry
+// (docs/proposal.md §4.3). With bind:state, the bound path two-way binds the
+// selected node id: clicking a node writes its id, the background writes null,
+// and an authored on:event select escalates to the host with { id } merged in.
+
+function asRecords(v: PropValue | undefined): Array<Record<string, PropValue>> {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (item): item is Record<string, PropValue> =>
+      item !== null && typeof item === 'object' && !Array.isArray(item),
+  );
+}
+
+function DiagramBlock({ node, ctx, path }: BlockProps): React.ReactElement {
+  const t = ctx.theme;
+  const props = node.props ?? {};
+  const layout = layoutDiagram({
+    direction: props.direction,
+    nodes: props.nodes,
+    edges: props.edges,
+    groups: props.groups,
+  });
+
+  const nodeMeta = new Map<string, Record<string, PropValue>>();
+  for (const n of asRecords(props.nodes)) {
+    const id = str(n.id);
+    if (id && !nodeMeta.has(id)) nodeMeta.set(id, n);
+  }
+  const groupMeta = new Map<string, Record<string, PropValue>>();
+  for (const g of asRecords(props.groups)) groupMeta.set(str(g.id), g);
+  // layout drops edges with unknown endpoints; mirror its filter so the input
+  // metadata (tone, dashed, label) zips 1:1 with layout.edges.
+  const anchored = new Set([...layout.nodes, ...layout.groups].map((r) => r.id));
+  const edgeMeta = asRecords(props.edges).filter(
+    (e) => anchored.has(str(e.from)) && anchored.has(str(e.to)),
+  );
+
+  const bind = node.directives?.['bind:state'];
+  const selectAction = node.directives?.['on:event']?.select;
+  const interactive =
+    ctx.manifest.interactive && (bind !== undefined || selectAction !== undefined);
+  const selected = bind ? readStatePath(ctx.state, bind) : undefined;
+  const pick = (id: string): void => {
+    if (bind) ctx.setKey(bind, id);
+    if (!selectAction) return;
+    if (typeof selectAction === 'object' && selectAction.args) {
+      const args: Record<string, unknown> = { id };
+      for (const [k, v] of Object.entries(selectAction.args)) {
+        if (k !== 'id') args[k] = isExprRef(v) ? undefined : v;
+      }
+      ctx.dispatch(selectAction, args);
+      return;
+    }
+    ctx.dispatch(selectAction, { id });
+  };
+
+  const hulls = layout.groups.map((r) => {
+    const meta = groupMeta.get(r.id) ?? {};
+    const tone = toneColor(t, meta.tone);
+    return h(
+      'g',
+      { key: `group.${r.id}` },
+      h('rect', {
+        key: 'hull',
+        x: r.x,
+        y: r.y,
+        width: r.w,
+        height: r.h,
+        rx: num(t.radius.md, 10),
+        fill: tinted(tone ?? t.color.fg, '5%'),
+        stroke: tinted(tone ?? t.color.fg, '16%'),
+      }),
+      h(
+        'text',
+        {
+          key: 'label',
+          x: r.x + 10,
+          y: r.y + 15,
+          fill: tone ?? t.color.subtle,
+          fontSize: 10.5,
+          fontWeight: 600,
+          letterSpacing: 0.4,
+        },
+        str(meta.label) || r.id,
+      ),
+    );
+  });
+
+  // One arrowhead marker per distinct edge color, populated while edges render.
+  const markerBase = `mosaic-arrow-${path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const markerColors: string[] = [];
+  const markerId = (color: string): string => {
+    let i = markerColors.indexOf(color);
+    if (i === -1) i = markerColors.push(color) - 1;
+    return `${markerBase}-${i}`;
+  };
+  const edgeEls = layout.edges.map((edge, i) => {
+    const meta = edgeMeta[i] ?? {};
+    const color = toneColor(t, meta.tone) ?? t.color.subtle ?? hairline(t);
+    const [p0, p1, p2] = edge.points as [
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number } | undefined,
+    ];
+    const d = p2
+      ? `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`
+      : `M ${p0.x} ${p0.y} L ${p1.x} ${p1.y}`;
+    const mid = p2
+      ? { x: 0.25 * p0.x + 0.5 * p1.x + 0.25 * p2.x, y: 0.25 * p0.y + 0.5 * p1.y + 0.25 * p2.y }
+      : { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+    const label = str(meta.label);
+    return h(
+      'g',
+      { key: `edge.${i}` },
+      h('path', {
+        key: 'line',
+        d,
+        fill: 'none',
+        stroke: color,
+        strokeWidth: 1.25,
+        strokeDasharray: meta.dashed === true ? '5 4' : undefined,
+        markerEnd: `url(#${markerId(color)})`,
+        markerStart: meta.bidirectional === true ? `url(#${markerId(color)})` : undefined,
+      }),
+      label
+        ? h(
+            'text',
+            {
+              key: 'label',
+              x: mid.x,
+              y: mid.y - 5,
+              textAnchor: 'middle',
+              fill: t.color.subtle,
+              fontSize: 10,
+            },
+            label,
+          )
+        : null,
+    );
+  });
+
+  const nodeEls = layout.nodes.map((r) => {
+    const meta = nodeMeta.get(r.id) ?? {};
+    const tone = toneColor(t, meta.tone);
+    const isSelected = selected !== null && selected !== undefined && str(selected) === r.id;
+    const sublabel = str(meta.sublabel);
+    const badge = str(meta.badge);
+    const badgeW = Math.round(badge.length * 6.2 + 12);
+    const cx = r.x + r.w / 2;
+    return h(
+      'g',
+      {
+        key: `node.${r.id}`,
+        'data-node-id': r.id,
+        onClick: interactive
+          ? (e: React.MouseEvent) => {
+              e.stopPropagation();
+              pick(r.id);
+            }
+          : undefined,
+        style: interactive ? { cursor: 'pointer' } : undefined,
+      },
+      h('rect', {
+        key: 'box',
+        x: r.x,
+        y: r.y,
+        width: r.w,
+        height: r.h,
+        rx: num(t.radius.sm, 6),
+        fill: tinted(tone, '10%') ?? surface(t) ?? 'transparent',
+        stroke: isSelected ? t.color.accent : (tinted(tone, '55%') ?? hairline(t)),
+        strokeWidth: isSelected ? 2 : 1,
+      }),
+      h(
+        'text',
+        {
+          key: 'label',
+          x: cx,
+          y: r.y + (sublabel ? r.h / 2 - 6 : r.h / 2),
+          textAnchor: 'middle',
+          dominantBaseline: 'central',
+          fill: t.color.fg,
+          fontSize: 12.5,
+          fontWeight: 550,
+          fontFamily: meta.kind === 'code' ? t.font.mono : t.font.sans,
+        },
+        str(meta.label) || r.id,
+      ),
+      sublabel
+        ? h(
+            'text',
+            {
+              key: 'sublabel',
+              x: cx,
+              y: r.y + r.h / 2 + 10,
+              textAnchor: 'middle',
+              dominantBaseline: 'central',
+              fill: t.color.subtle,
+              fontSize: 10.5,
+            },
+            sublabel,
+          )
+        : null,
+      badge
+        ? h(
+            'g',
+            { key: 'badge' },
+            h('rect', {
+              key: 'chip',
+              x: r.x + r.w - badgeW - 6,
+              y: r.y - 9,
+              width: badgeW,
+              height: 16,
+              rx: 8,
+              fill: surface(t) ?? t.color.bg,
+              stroke: tinted(tone, '45%') ?? hairline(t),
+            }),
+            h(
+              'text',
+              {
+                key: 'text',
+                x: r.x + r.w - 6 - badgeW / 2,
+                y: r.y - 1,
+                textAnchor: 'middle',
+                fill: tone ?? t.color.subtle,
+                fontSize: 9.5,
+                fontWeight: 600,
+              },
+              badge,
+            ),
+          )
+        : null,
+    );
+  });
+
+  return h(
+    'svg',
+    {
+      role: 'img',
+      'aria-label': str(props.alt),
+      width: layout.width,
+      height: layout.height,
+      viewBox: `0 0 ${layout.width} ${layout.height}`,
+      style: { display: 'block', maxWidth: '100%', height: 'auto', fontFamily: t.font.sans },
+    },
+    h(
+      'defs',
+      { key: 'defs' },
+      ...markerColors.map((color, i) =>
+        h(
+          'marker',
+          {
+            key: `m.${i}`,
+            id: `${markerBase}-${i}`,
+            viewBox: '0 0 10 10',
+            refX: 9,
+            refY: 5,
+            markerWidth: 7,
+            markerHeight: 7,
+            orient: 'auto-start-reverse',
+          },
+          h('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: color }),
+        ),
+      ),
+    ),
+    h('rect', {
+      key: 'bg',
+      'data-diagram-bg': 'true',
+      x: 0,
+      y: 0,
+      width: layout.width,
+      height: layout.height,
+      fill: 'transparent',
+      onClick: interactive && bind ? () => ctx.setKey(bind, null) : undefined,
+    }),
+    ...hulls,
+    ...edgeEls,
+    ...nodeEls,
+  );
+}
+
 // --- node rendering -----------------------------------------------------------------
 
 function renderChildren(node: MosaicNode, ctx: RenderContext, path: string): React.ReactNode[] {
@@ -726,7 +1027,7 @@ function renderNode(node: MosaicNode, ctx: RenderContext, key: string): React.Re
       node,
       props: resolvedProps,
       children: renderChildren(node, ctx, key),
-      value: bind ? ctx.state[bind] : undefined,
+      value: bind ? readStatePath(ctx.state, bind) : undefined,
       setValue: bind ? (v: unknown) => ctx.setKey(bind, v) : undefined,
       events,
     });
@@ -754,7 +1055,7 @@ function renderNode(node: MosaicNode, ctx: RenderContext, key: string): React.Re
   const children = () => renderChildren(node, ctx, key);
   const handlers = eventHandlers(node, ctx);
   const bind = node.directives?.['bind:state'];
-  const bound = bind ? ctx.state[bind] : undefined;
+  const bound = bind ? (readStatePath(ctx.state, bind) ?? undefined) : undefined;
 
   switch (node.type) {
     // --- layout
@@ -1347,12 +1648,38 @@ function renderNode(node: MosaicNode, ctx: RenderContext, key: string): React.Re
             item !== null && typeof item === 'object' && !Array.isArray(item) ? item : {};
           const e = entry as Record<string, PropValue>;
           const tone = toneColor(t, e.tone);
+          const description = str(e.description);
           return h(
             'li',
             { key: `${key}.${i}`, style: { display: 'flex', gap: 8, padding: '2px 0' } },
             h('span', { key: `${key}.${i}.dot`, style: { color: tone ?? t.color.subtle } }, '●'),
-            h('span', { key: `${key}.${i}.date`, style: { color: t.color.subtle } }, str(e.date)),
-            h('span', { key: `${key}.${i}.title` }, str(e.title)),
+            h(
+              'div',
+              {
+                key: `${key}.${i}.body`,
+                style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
+              },
+              h(
+                'div',
+                { key: `${key}.${i}.head`, style: { display: 'flex', gap: 8 } },
+                h(
+                  'span',
+                  { key: `${key}.${i}.date`, style: { color: t.color.subtle } },
+                  str(e.date),
+                ),
+                h('span', { key: `${key}.${i}.title` }, str(e.title)),
+              ),
+              description
+                ? h(
+                    'div',
+                    {
+                      key: `${key}.${i}.description`,
+                      style: { color: t.color.subtle, fontSize: '0.85rem' },
+                    },
+                    description,
+                  )
+                : null,
+            ),
           );
         }),
       );
@@ -1382,6 +1709,8 @@ function renderNode(node: MosaicNode, ctx: RenderContext, key: string): React.Re
           str(get('label')),
         ),
       );
+    case 'Diagram':
+      return h(DiagramBlock, { key, node, ctx, path: key });
     case 'Chart': {
       // The reference renderer draws bar charts; everything else falls to alt.
       const series = Array.isArray(props.series) ? props.series : [];
