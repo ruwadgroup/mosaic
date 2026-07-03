@@ -7,7 +7,8 @@ Thanks for considering it. This is a small project right now and the bar for con
 - **Read the proposal first** ([`docs/proposal.md`](../docs/proposal.md)). Most disagreements in this space evaporate after a careful read. The ones that don't are the interesting ones.
 - **Skim the examples** in [`examples/`](../examples/). They're the shortest path to seeing what Mosaic _feels_ like.
 
-> [!TIP] > **Small fixes** (typos, broken links, doc nits) → just send a PR.
+> [!TIP]
+> **Small fixes** (typos, broken links, doc nits) → just send a PR.
 > **Big PRs** (new preset, new directive, renderer port, wire-format change) → open an issue first. I'd rather discuss a 20-line direction than review a 2000-line PR I have to ask you to throw away.
 
 ## What kind of changes I'm looking for, in priority order

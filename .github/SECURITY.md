@@ -4,7 +4,8 @@ Mosaic's security claims live in [§8 of the proposal](../docs/proposal.md#8-sec
 
 ## Reporting a vulnerability
 
-> [!WARNING] > **Don't open a public GitHub issue for a security report.** Public disclosure before a fix is shipped puts users at risk. Email me directly instead.
+> [!WARNING]
+> **Don't open a public GitHub issue for a security report.** Public disclosure before a fix is shipped puts users at risk. Email me directly instead.
 
 - **[tamimbinhakim.work@gmail.com](mailto:tamimbinhakim.work@gmail.com)** — subject line starting with `[mosaic-security]`.
 
