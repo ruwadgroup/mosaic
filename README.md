@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Proposal](https://img.shields.io/badge/proposal-founding-7c7cff.svg)](docs/proposal.md)
 [![mosaic_version](https://img.shields.io/badge/mosaic__version-1.0--draft-7c7cff.svg)](docs/proposal.md)
-[![Discussion](https://img.shields.io/badge/discuss-issues-blue.svg)](https://github.com/tamimbinhakim/mosaic/issues)
+[![Discussion](https://img.shields.io/badge/discuss-issues-blue.svg)](https://github.com/ruwadgroup/mosaic/issues)
 
 </div>
 
@@ -133,12 +133,14 @@ See the [examples README](examples/README.md) for the full set and how to read t
 
 ## Where to read
 
+- **[docs/getting-started.md](docs/getting-started.md)** - render an artifact in five minutes; the [docs index](docs/README.md) has the full reference set (language, blocks, state, `expr`, rendering, MCP).
 - **[docs/proposal.md](docs/proposal.md)** - the full technical proposal; the definition of the format, cited by section number.
 - **[docs/design-history.md](docs/design-history.md)** - the origin story, in my own words.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - the intended design and the invariants an implementation preserves.
 - **[ROADMAP.md](ROADMAP.md)** - the staged build order.
 - **[specs/](specs)** - one spec per capability, mapped to the proposal.
 - **[schema/](schema)** - the JSON Schemas.
+- **[skills/](skills)** - the attachable agent skill that teaches a model to emit Mosaic; a template hosts edit to mirror their manifest.
 - **[packages/](packages)** - the reference implementation (TypeScript).
 
 ## Built on

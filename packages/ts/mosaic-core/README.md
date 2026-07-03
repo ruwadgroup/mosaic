@@ -8,7 +8,7 @@ This is the one package everything else depends on.
 It absorbs what were separate `@mosaic/wire` (compile), `@mosaic/schema` (registry + validate), and `@mosaic/host` (manifest + theme) packages - the IR is small enough that splitting them added surface without value.
 
 - **IR** - `MosaicNode`, `MosaicDocument`, `Directives`, `JsonLiteral` (docs/proposal.md [§4](../../../docs/proposal.md#4-the-building-blocks)).
-- **Compile** - `parse` / `compile` (`Mosaic -> IR`) and the IR's canonical JSON serialization; `loadMosaic` reads `.mosaic` source (§5).
+- **Compile** - `parse` / `serialize` (`Mosaic -> IR` and the IR's canonical JSON serialization); `loadMosaic` / `saveMosaic` read and write fenced `.mosaic` source (§5).
 - **expr** - `evalExpr`, the bounded CEL-class expression language behind `from:expr` / `if:show` / `for:each` (§6.2). AST-interpreted, never `eval`.
 - **walk** - `walk(doc, visitor, manifest)`, the portable contract every framework implements (§7.2).
 - **Manifest** - `HostManifest`, `DEFAULT_MANIFEST`, `compactManifest` (§3.3); plus `Theme`, `DEFAULT_THEME`, and `resolveToken` for renderers that take a token→value map.

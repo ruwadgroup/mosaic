@@ -1,9 +1,17 @@
 # @mosaic/mcp
 
-> MCP delivery for Mosaic: return an artifact as a `ui://` resource, and relay `on:event` host actions to the host.
+> Optional MCP delivery for Mosaic: return an artifact as a `ui://` resource, and relay `on:event` host intents under host policy.
 
-**Status: scaffold.**
+**Status: implemented.** Resources, the MCP-Apps HTML bridge, and permission-gated intent relay are real and under test.
 
-This is how a Mosaic artifact reaches an app. An artifact-producing tool returns the AST as a `ui://mosaic/*` resource (`application/vnd.mosaic+json`), which a Mosaic-aware host renders natively, or as the `mosaic-over-mcp-apps` bridge for hosts that only speak MCP Apps. When a rendered artifact fires an `on:event` host action, the bridge hands that named intent to the host under its policy - the artifact never touches credentials or the network. See [§7.1](../../../docs/proposal.md#71-delivery-over-mcp) and [§8](../../../docs/proposal.md#8-security).
+This is how an artifact reaches an app that never pre-integrated it; the core needs none of this.
+An artifact-producing tool returns the IR as a `ui://mosaic/*` resource (`application/vnd.mosaic+json`), which a Mosaic-aware host detects with `isMosaicResource` and renders natively - no iframe.
+Hosts that only speak MCP Apps get a second, static `text/html;profile=mcp-app` representation via `toHtmlBridge`.
+`createBridge` packages both directions and refuses intents the manifest's `permissions` deny.
 
-Target size: ~300 LOC.
+```ts
+import { toResource, isMosaicResource, createBridge } from "@mosaic/mcp";
+```
+
+Full reference: [docs/mcp.md](../../../docs/mcp.md).
+See [§7.1](../../../docs/proposal.md#71-delivery-over-mcp) and [§8](../../../docs/proposal.md#8-security).

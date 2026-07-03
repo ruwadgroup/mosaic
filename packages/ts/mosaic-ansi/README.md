@@ -1,11 +1,18 @@
 # @mosaic/ansi
 
-> The text/degraded renderer for Mosaic - the `decomposeTo` floor. No React; walks the AST and emits plain text / ANSI.
+> The text/degraded renderer for Mosaic - the `decomposeTo` floor. No React; renders the IR as plain text or ANSI.
 
-**Status: scaffold.**
+**Status: implemented.** The full example gallery renders under test.
 
-For scripts, CI logs, pipes, and any non-web host that wants a baseline. Decomposition is heavy: `KPI` becomes a one-line `label: value (delta)`, `Comparison` becomes a multi-column boxed table, `BarChart` becomes Unicode block characters. It proves that a preset degrades to primitives cleanly.
+For scripts, CI logs, pipes, and any non-web host that wants a baseline.
+Rich blocks decompose to primitives (a `Diagram` becomes grouped node lines and `from -> to` edges, a `DataTable` becomes an aligned text table, `Progress` becomes `[█████░░░] 50%`), controls print their state, and derived `expr` values still evaluate - they are content, not interaction.
 
-See [§7.2](../../../docs/proposal.md#72-the-public-api).
+```ts
+import { renderAnsi } from "@mosaic/ansi";
 
-Target size: ~400 LOC.
+console.log(renderAnsi(source)); // plain text, safe to pipe
+console.log(renderAnsi(source, { color: true })); // ANSI tones
+```
+
+It exists to prove the floor: every artifact renders readably everywhere ([invariant 8](../../../ARCHITECTURE.md#invariants)).
+Full reference: [docs/rendering.md](../../../docs/rendering.md#mosaicansi---the-text-floor).

@@ -1,24 +1,29 @@
 # @mosaic/react
 
-> The reference React renderer for Mosaic. Web. The worked example a builder copies for their own stack.
+> The reference React renderer for Mosaic - the provided web library, and the worked example a builder copies for their own stack.
 
-**Status: scaffold.** `MosaicArtifact` returns `null` today.
+**Status: implemented.** The full pipeline (`parse → validate → resolve → render`), the reference blocks, path-based state, custom-component overrides, theming, and the SVG `Diagram` renderer are real and under test.
 
-Mosaic ships one reference renderer, and this is it. ~1500 LOC of TypeScript when complete. The architecture mirrors `safe-mdx` and Sophie Alpert's _build your own React renderer_: `render()` is `parse → validate → resolve → walk(reactVisitor)` from `@mosaic/core`, mounting a React subtree from a registry of blocks. No `eval`, no `Function`, no `dangerouslySetInnerHTML`. A renderer for SwiftUI, Compose, Flutter, or a TUI is the same shape - a `NodeVisitor` against the same `walk()` contract.
-
-See [§7.2](../../../docs/proposal.md#72-the-public-api).
-
-## Planned API
+The architecture mirrors `safe-mdx` and Sophie Alpert's _build your own React renderer_: state lives in one React store, every state change re-resolves the artifact, and only named host intents leave through `onAction`.
+No `eval`, no `Function`, no `dangerouslySetInnerHTML`.
+A renderer for SwiftUI, Compose, Flutter, or a TUI is the same shape - a `NodeVisitor` against `@mosaic/core`'s `walk()` contract.
 
 ```tsx
-import { render, Mosaic } from '@mosaic/react';
-import { DEFAULT_MANIFEST } from '@mosaic/core';
+import { render, Mosaic } from "@mosaic/react";
 
 // as a function:
-render(artifactSource, { manifest: DEFAULT_MANIFEST, onAction: (name, args) => host.handle(name, args) });
+render(source, {
+  theme: myTheme, // token → value map for the reference blocks
+  components: { Card: MyCard }, // your own blocks win over everything
+  onAction: (name, args) => host.handle(name, args), // every host intent lands here
+});
 
 // or as a component:
-<Mosaic source={artifactSource} manifest={manifest} onAction={onAction} />
+<Mosaic source={source} onAction={onAction} />;
 ```
 
-`onAction` receives every `on:event` host intent; local `state.*` mutations and `expr` derivations stay inside the renderer. Delivery over MCP is a separate concern - see `@mosaic/mcp`.
+Local `state.*` mutations and `expr` derivations stay inside the renderer; `onAction` receives only host intents, with their `expr` args already computed.
+`layoutDiagram` - the deterministic, dependency-free diagram layout - is exported for hosts that draw `Diagram` themselves.
+
+Full reference: [docs/rendering.md](../../../docs/rendering.md).
+Delivery over MCP is a separate concern - see `@mosaic/mcp`.

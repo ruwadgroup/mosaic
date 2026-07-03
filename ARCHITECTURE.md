@@ -112,6 +112,7 @@ Specs and the proposal reference them by number.
    Mosaic - the JSX pattern - compiles to a single canonical typed tree, the IR.
    The IR is the format's identity and the contract every renderer targets; it serializes losslessly to and from JSON.
    Compilation is one-directional: `Mosaic -> IR` is the only path in, and nobody hand-authors the IR.
+   The model never touches the IR in either direction: it neither emits mosaic-json nor receives it - everything model-facing (prompts, skills, tool results echoed into context) carries the Mosaic pattern.
 
 6. **The host owns the design.**
    Every component is rendered by the host's own renderer, and artifacts reference tokens (`token("color.accent")`, `tone="warn"`), never raw values (`#d97706`).
@@ -128,7 +129,7 @@ Specs and the proposal reference them by number.
 
 ## Renderer capabilities
 
-A renderer declares in its manifest whether it is **interactive**, which rich components it supports (`components_supported`), and a **graphics** level (`none | static | rich`).
+A renderer declares in its manifest whether it is **interactive** and which rich components it supports (`components_supported`).
 Two rules keep one artifact working everywhere: an unsupported rich component renders its `decomposeTo` expansion, and a non-interactive renderer renders controls in their default state and ignores `bind:state`, `from:expr`, `if:show`, and `on:event`.
 
 ## Delivery: how an artifact reaches an app

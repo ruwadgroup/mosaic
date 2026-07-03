@@ -164,7 +164,6 @@ so no color, spacing, or font value ever travels:
 {
   "mosaic_version": "1.0",
   "interactive": true,
-  "graphics": "rich", // none | static | rich
   "components_supported": ["DataTable", "Chart", "Tree", "Board", "Timeline", "Stat"],
   "directives_supported": ["bind:state", "from:state", "from:expr", "if:show", "for:each", "on:event", "theme:scope", "slot:name", "key"],
   "permissions": { "Embed": "deny" }
@@ -323,6 +322,9 @@ The IR is the canonical typed tree Mosaic compiles to, one-to-one with the node 
 [§4](#4-the-building-blocks).
 Its JSON serialization is what the validator checks, what storage and diff tooling consume, and what
 an MCP tool returns; nobody emits it token-by-token, so its per-node key tax is free.
+The IR is machine-to-machine and the model never touches it in either direction: everything
+model-facing - the system prompt, an attached skill, a tool result echoed into context - carries
+Mosaic, and a host that needs an artifact back in front of the model hands it the mosaic-jsx form.
 A compiled artifact is exactly this - the IR serialized as canonical JSON, carrying `mosaic_version`
 for migration-on-load:
 
