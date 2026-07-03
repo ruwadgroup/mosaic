@@ -1,7 +1,7 @@
 {
-  "name": "@mosaic/core",
-  "version": "0.0.0",
-  "description": "The Mosaic core: AST types, mosaic-jsx/mosaic-json parse + serialize, validate, resolve, the expr evaluator, walk(), the block registry, and the Host Manifest + theme.",
+  "name": "@mosaicjs/core",
+  "version": "0.8.0",
+  "description": "The Mosaic core: the mosaic-jsx compiler, IR types, validate, resolve, the bounded expr evaluator, the modular block vocabulary (defineBlockSchema, createRegistry, macros), and the Host Manifest.",
   "license": "MIT",
   "author": "Tamim Bin Hakim <tamimbinhakim.work@gmail.com>",
   "type": "module",
@@ -13,6 +13,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./blocks": {
+      "types": "./dist/blocks.d.ts",
+      "import": "./dist/blocks.js",
+      "require": "./dist/blocks.cjs"
     }
   },
   "files": ["dist", "README.md", "LICENSE"],
@@ -23,5 +28,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist .tsbuildinfo"
   },
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }

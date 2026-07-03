@@ -1,43 +1,50 @@
-// @mosaic/ansi - the text/degraded renderer: the decomposeTo floor.
+// @mosaicjs/ansi - the text/degraded renderer: the decompose floor.
 //
 // Every artifact renders to readable text: rich components decompose to
-// primitives, controls print their default state, and if the terminal offers
-// color the tones use it. See docs/proposal.md §7.2.
+// primitives via their block definition's decompose recipe or expandsTo macro,
+// controls print their default state, and tones map to ANSI codes when enabled.
+// Accepts an optional MosaicRegistry for host-defined blocks with macro support.
+// See docs/proposal.md §7.2.
 
 import {
   DEFAULT_MANIFEST,
+  DEFAULT_REGISTRY,
   type HostManifest,
   JsxError,
   type MosaicDocument,
   type MosaicNode,
+  type MosaicRegistry,
   type PropValue,
   TEXT_TYPE,
-  blockSpec,
+  expandMacro,
   initialState,
   parse,
   resolve,
   validate,
-} from '@mosaic/core';
+} from '@mosaicjs/core';
 
+/** Options for renderAnsi. All fields are optional; defaults target safe piped output. */
 export type AnsiOptions = {
   manifest?: HostManifest;
+  registry?: MosaicRegistry;
   /** Emit ANSI escape codes. Off by default so output is safe to pipe. */
   color?: boolean;
   /** Line width for dividers. */
   width?: number;
 };
 
-const RESET = '\u001b[0m';
-const BOLD = '\u001b[1m';
-const DIM = '\u001b[2m';
+const RESET = '[0m';
+const BOLD = '[1m';
+const DIM = '[2m';
 const TONE_CODES: Record<string, string> = {
-  ok: '\u001b[32m',
-  warn: '\u001b[33m',
-  bad: '\u001b[31m',
+  ok: '[32m',
+  warn: '[33m',
+  bad: '[31m',
   subtle: DIM,
 };
 
-/** The text renderer draws nothing rich natively - everything decomposes. */
+/** Components with a bespoke ANSI rendering; everything else decomposes or
+ *  falls through to children. */
 const TEXT_MANIFEST: HostManifest = {
   ...DEFAULT_MANIFEST,
   interactive: false,
@@ -48,6 +55,7 @@ type Ctx = {
   color: boolean;
   width: number;
   indent: number;
+  registry: MosaicRegistry;
 };
 
 function str(v: PropValue | undefined): string {
@@ -75,9 +83,12 @@ function lines(node: MosaicNode, ctx: Ctx): string[] {
     return [str(node.props?.value)];
   }
 
-  const spec = blockSpec(node.type);
-  if (spec?.rich && spec.decomposeTo && !TEXT_MANIFEST.components_supported.includes(node.type)) {
-    return lines(spec.decomposeTo(node), ctx);
+  const def = ctx.registry.get(node.type);
+
+  // Rich built-in: decompose to primitives when this renderer has no bespoke
+  // ANSI handling (the decompose floor, proposal §7.2 invariant 8).
+  if (def?.rich && def.decompose && !TEXT_MANIFEST.components_supported.includes(node.type)) {
+    return lines(def.decompose(node), ctx);
   }
 
   const props = node.props ?? {};
@@ -98,7 +109,6 @@ function lines(node: MosaicNode, ctx: Ctx): string[] {
     }
     case 'Text': {
       const codes: string[] = [];
-      if (props.weight === 'bold') codes.push(BOLD);
       const c = tone ?? (props.tone === 'subtle' ? DIM : undefined);
       if (c) codes.push(c);
       return [paint(ctx, inline(), ...codes)];
@@ -116,12 +126,7 @@ function lines(node: MosaicNode, ctx: Ctx): string[] {
     }
     case 'Stack': {
       if (props.direction === 'horizontal') return [kids().join('  ')];
-      const gap = num(props.gap, 0) >= 3 ? [''] : [];
-      const inner = (node.children ?? []).flatMap((c, i) => {
-        const block = lines(c, ctx);
-        return i === 0 ? block : [...gap, ...block];
-      });
-      return inner;
+      return (node.children ?? []).flatMap((c) => lines(c, ctx));
     }
     case 'Grid':
       return kids();
@@ -241,8 +246,15 @@ function lines(node: MosaicNode, ctx: Ctx): string[] {
       });
     case 'Empty':
       return [paint(ctx, str(props.label) || 'Nothing here yet.', DIM)];
-    default:
+    default: {
+      // Host blocks with an expandsTo macro render via expansion; all others
+      // fall through to rendering children in order.
+      if (def?.expandsTo) {
+        const expanded = expandMacro(node, ctx.registry);
+        if (expanded) return lines(expanded, ctx);
+      }
       return kids();
+    }
   }
 }
 
@@ -258,8 +270,9 @@ export function renderAnsi(source: string | MosaicDocument, opts?: AnsiOptions):
     doc = source;
   }
 
+  const registry = opts?.registry ?? DEFAULT_REGISTRY;
   const manifest = { ...TEXT_MANIFEST, ...(opts?.manifest ?? {}), interactive: false };
-  const checked = validate(doc, manifest);
+  const checked = validate(doc, manifest, { registry });
   if (!checked.ok) {
     throw new Error(
       `mosaic: invalid artifact:\n${checked.errors
@@ -268,9 +281,14 @@ export function renderAnsi(source: string | MosaicDocument, opts?: AnsiOptions):
     );
   }
 
-  // A text surface still evaluates expr: the derived values are part of the
-  // content. Interactivity (state changes) is what a static surface lacks.
+  // A text surface still evaluates expressions: the derived values are part of
+  // the content. Interactivity (state changes) is what a static surface lacks.
   const resolved = resolve(doc, { ...manifest, interactive: true }, initialState(doc));
-  const ctx: Ctx = { color: opts?.color ?? false, width: opts?.width ?? 60, indent: 0 };
+  const ctx: Ctx = {
+    color: opts?.color ?? false,
+    width: opts?.width ?? 60,
+    indent: 0,
+    registry,
+  };
   return `${lines(resolved.root, ctx).join('\n')}\n`;
 }

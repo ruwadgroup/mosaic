@@ -9,6 +9,9 @@ import type { JsonLiteral } from './ast.js';
 
 export type ExprValue = JsonLiteral;
 
+/** Thrown by parseExpr, compile, and evalExpr when the expression violates the
+ *  grammar or exceeds a cost limit. position is the character offset into the
+ *  original source string. */
 export class ExprError extends Error {
   readonly position: number;
   constructor(message: string, position = 0) {
@@ -18,16 +21,12 @@ export class ExprError extends Error {
   }
 }
 
-// --- limits ---------------------------------------------------------------
-
 /** Maximum AST nodes an expression may parse to (static cost bound). */
 export const MAX_EXPR_NODES = 500;
 /** Maximum interpreter steps per evaluation (runtime backstop). */
 export const MAX_EXPR_STEPS = 100_000;
 /** Maximum string length a string function will produce. */
 const MAX_STRING = 100_000;
-
-// --- AST ------------------------------------------------------------------
 
 type Ast =
   | { t: 'lit'; v: string | number | boolean | null }
@@ -39,8 +38,6 @@ type Ast =
   | { t: 'binary'; op: string; left: Ast; right: Ast }
   | { t: 'cond'; test: Ast; then: Ast; else: Ast }
   | { t: 'call'; fn: string; args: Ast[]; lambda?: { param: string; body: Ast; extra?: string } };
-
-// --- tokenizer --------------------------------------------------------------
 
 type Token = { kind: 'num' | 'str' | 'ident' | 'op'; value: string; pos: number };
 
@@ -122,11 +119,11 @@ function tokenize(src: string): Token[] {
   return tokens;
 }
 
-// --- function catalog -------------------------------------------------------
-
 /** Functions whose trailing argument is an unevaluated body over a bound item. */
 const LAMBDA_FNS = new Set(['map', 'filter', 'any', 'all', 'sortBy', 'reduce']);
 
+/** The full catalog of built-in function names the expr grammar accepts.
+ *  Any call to a name outside this set is a compile error. */
 export const EXPR_FUNCTIONS = [
   // math
   'abs',
@@ -168,8 +165,6 @@ export const EXPR_FUNCTIONS = [
 ] as const;
 
 const FUNCTION_SET = new Set<string>(EXPR_FUNCTIONS);
-
-// --- parser (Pratt) --------------------------------------------------------
 
 class Parser {
   private readonly tokens: Token[];
@@ -394,6 +389,8 @@ class Parser {
 
 const astCache = new Map<string, Ast>();
 
+/** Parse and validate an expr source string. Throws ExprError on any violation.
+ *  Used by the compiler and validator as a fast well-formedness gate. */
 export function parseExpr(source: string): void {
   compile(source);
 }
@@ -454,8 +451,6 @@ export function exprDependencies(source: string): string[] {
   visit(compile(source), new Set());
   return [...deps];
 }
-
-// --- interpreter -------------------------------------------------------------
 
 type Scope = Record<string, ExprValue>;
 
@@ -764,8 +759,6 @@ export function evalExpr(source: string, scope: Record<string, ExprValue>): Expr
   return new Interpreter().eval(compile(source), scope);
 }
 
-// --- state-path plumbing ----------------------------------------------------
-//
 // Internal surface for state-path.ts: a state path is a shape-restricted expr
 // AST, and its [index] sub-expressions evaluate with the same interpreter.
 // Not re-exported from the package index.
@@ -782,7 +775,8 @@ export function evalExprAst(ast: Ast, scope: Record<string, ExprValue>): ExprVal
   return new Interpreter().eval(ast, scope);
 }
 
-/** Format an expr result for text display. */
+/** Format an expr result as a display string: null and undefined become "",
+ *  objects become their JSON representation, everything else uses String(). */
 export function displayValue(v: ExprValue): string {
   return str(v);
 }

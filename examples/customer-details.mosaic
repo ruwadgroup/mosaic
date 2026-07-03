@@ -1,5 +1,5 @@
 ```mosaic v=1 id=customer-details
-<Stack gap="4" state={{
+<Stack state={{
     txFilter: "All",
     note: "",
     txns: [
@@ -16,10 +16,10 @@
       ledger, screening hits, and an escalation that hands the host the whole
       picture as one intent. Domain shapes from the nexaml AML console. */}
 
-  <Stack direction="horizontal" gap="3">
+  <Stack direction="horizontal">
     <Avatar name="Meridian Trading FZE" />
-    <Stack gap="1">
-      <Stack direction="horizontal" gap="2">
+    <Stack>
+      <Stack direction="horizontal">
         <Heading level={2}>Meridian Trading FZE</Heading>
         <Badge tone="bad">high risk</Badge>
         <Badge tone="warn">PEP-linked</Badge>
@@ -29,17 +29,17 @@
     </Stack>
   </Stack>
 
-  <Grid cols={12} gap="3">
-    <Stat slot:name="a" label="Risk score" value="78 / 100" tone="bad" />
-    <Stat slot:name="b" label="Transactions (90d)" value={expr("count(txns)")} />
-    <Stat slot:name="c" label="Flagged" value={expr("count(filter(txns, t, t.flagged))")} tone="warn" />
-    <Stat slot:name="d" label="Next KYC review" value="Jul 15" />
+  <Grid cols={12}>
+    <Stat label="Risk score" value="78 / 100" tone="bad" />
+    <Stat label="Transactions (90d)" value={txns.length} />
+    <Stat label="Flagged" value={txns.filter(t => t.flagged).length} tone="warn" />
+    <Stat label="Next KYC review" value="Jul 15" />
   </Grid>
 
   <Tabs active="Overview" items={["Overview", "Transactions", "Screening", "Notes"]}>
 
-    <Grid cols={12} gap="3">
-      <Card slot:name="profile" gap="2">
+    <Grid cols={12}>
+      <Card>
         <Heading level={3}>Profile</Heading>
         <DataTable
           columns={["Field", "Value"]}
@@ -53,59 +53,61 @@
             ["Expected volume",      "$150k - 400k / month"]
           ]} />
       </Card>
-      <Card slot:name="risk" gap="2">
+      <Card>
         <Heading level={3}>Risk trend</Heading>
         <Chart
           type="bar"
           alt="Quarterly risk score: 54 in Q3, 61 in Q4, 70 in Q1, 78 in Q2 - rising for a year."
-          series={[{ name: "Risk score", points: [["Q3", 54], ["Q4", 61], ["Q1", 70], ["Q2", 78]] }]} />
+          data={[{ label: "Q3", value: 54 }, { label: "Q4", value: 61 }, { label: "Q1", value: 70 }, { label: "Q2", value: 78 }]} />
         <Callout tone="warn">
           Score has risen four quarters straight. Drivers: cash-intensive counterparties, UBO PEP link, and two structuring flags this month.
         </Callout>
       </Card>
     </Grid>
 
-    <Stack gap="3">
-      <Stack direction="horizontal" gap="3">
-        <SegmentedControl bind:state="txFilter" options={["All", "Incoming", "Flagged"]} />
+    <Stack>
+      <Stack direction="horizontal">
+        <SegmentedControl value={txFilter} options={["All", "Incoming", "Flagged"]} />
         <Text tone="subtle">
-          {expr("concat('Showing ', count(filter(txns, t, txFilter == 'All' || (txFilter == 'Incoming' && t.dir == 'in') || (txFilter == 'Flagged' && t.flagged))), ' of ', count(txns), ' · flagged total ', formatCurrency(sum(map(filter(txns, t, t.flagged), t, t.amount))))")}
+          {`Showing ${txns.filter(t => txFilter == 'All' || (txFilter == 'Incoming' && t.dir == 'in') || (txFilter == 'Flagged' && t.flagged)).length} of ${txns.length} · flagged total ${formatCurrency(sum(txns.filter(t => t.flagged).map(t => t.amount)))}`}
         </Text>
       </Stack>
-      <List for:each="filter(txns, t, txFilter == 'All' || (txFilter == 'Incoming' && t.dir == 'in') || (txFilter == 'Flagged' && t.flagged)) as tx">
-        <Card key={expr("tx.ref")} gap="1">
-          <Stack direction="horizontal" gap="2">
-            <Badge tone={expr("tx.flagged ? 'bad' : tx.dir == 'in' ? 'ok' : 'subtle'")}>
-              {expr("tx.flagged ? 'flagged' : tx.dir == 'in' ? 'in' : 'out'")}
-            </Badge>
-            <Text weight="bold">{expr("formatCurrency(tx.amount)")}</Text>
-            <Text tone="subtle">{expr("concat(tx.ref, ' · ', tx.cpty, ' · ', tx.date)")}</Text>
-          </Stack>
-          <Text if:show="tx.flagged" tone="warn">{expr("tx.reason")}</Text>
-        </Card>
+      <List>
+        {txns.filter(t => txFilter == 'All' || (txFilter == 'Incoming' && t.dir == 'in') || (txFilter == 'Flagged' && t.flagged)).map(tx => (
+          <Card key={tx.ref}>
+            <Stack direction="horizontal">
+              <Badge tone={tx.flagged ? 'bad' : tx.dir == 'in' ? 'ok' : 'subtle'}>
+                {tx.flagged ? 'flagged' : tx.dir == 'in' ? 'in' : 'out'}
+              </Badge>
+              <Text variant="label">{formatCurrency(tx.amount)}</Text>
+              <Text tone="subtle">{`${tx.ref} · ${tx.cpty} · ${tx.date}`}</Text>
+            </Stack>
+            {tx.flagged && <Text tone="warn">{tx.reason}</Text>}
+          </Card>
+        ))}
       </List>
     </Stack>
 
-    <Stack gap="3">
-      <Card gap="2">
-        <Stack direction="horizontal" gap="2">
+    <Stack>
+      <Card>
+        <Stack direction="horizontal">
           <Heading level={3}>Sanctions screening</Heading>
           <Badge tone="warn">possible match</Badge>
         </Stack>
         <Text>"Meridian Trading" - 82% name similarity against OFAC SDN entry #48122 (Meridian Trading Co, IR). Different jurisdiction and incorporation date; likely a false positive, unresolved for 12 days.</Text>
-        <Stack direction="horizontal" gap="2">
+        <Stack direction="horizontal">
           <Tag>OFAC SDN</Tag><Tag>name match 82%</Tag><Tag>hold: sanctions_match</Tag>
         </Stack>
       </Card>
-      <Card gap="2">
-        <Stack direction="horizontal" gap="2">
+      <Card>
+        <Stack direction="horizontal">
           <Heading level={3}>PEP review</Heading>
           <Badge tone="warn">open</Badge>
         </Stack>
         <Text>UBO is the nephew of a serving GCC transport minister. Relationship documented at onboarding; enhanced due diligence renewal is part of the Jul 15 periodic review.</Text>
       </Card>
-      <Card gap="2">
-        <Stack direction="horizontal" gap="2">
+      <Card>
+        <Stack direction="horizontal">
           <Heading level={3}>Adverse media</Heading>
           <Badge tone="ok">clear</Badge>
         </Stack>
@@ -113,7 +115,7 @@
       </Card>
     </Stack>
 
-    <Stack gap="3">
+    <Stack>
       <Timeline items={[
         { date: "Jun 28", title: "TX-90112 flagged: structuring pattern across 3 deposits", tone: "bad" },
         { date: "Jun 24", title: "Two cash deposits just under the AED 40k reporting threshold", tone: "warn" },
@@ -122,9 +124,9 @@
         { date: "May 02", title: "Risk score raised 70 → 78 (quarterly measurement)", tone: "bad" }
       ]} />
       <Field label="Add a note">
-        <Input type="text" bind:state="note" placeholder="Visible to the compliance team, appended to the audit trail" />
+        <Input type="text" value={note} placeholder="Visible to the compliance team, appended to the audit trail" />
       </Field>
-      <Button on:event={{ click: { action: "addNote", args: { customer: "CUS-2841", body: expr("note") } } }}>
+      <Button onClick={addNote({ customer: "CUS-2841", body: note })}>
         Add note
       </Button>
     </Stack>
@@ -133,19 +135,19 @@
 
   <Divider />
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Button
-      tone="primary"
-      on:event={{ click: { action: "escalateToCase", args: {
+      variant="primary"
+      onClick={escalateToCase({
         customer: "CUS-2841",
         riskScore: 78,
-        flaggedCount: expr("count(filter(txns, t, t.flagged))"),
-        flaggedTotal: expr("sum(map(filter(txns, t, t.flagged), t, t.amount))"),
+        flaggedCount: txns.filter(t => t.flagged).length,
+        flaggedTotal: sum(txns.filter(t => t.flagged).map(t => t.amount)),
         openHolds: ["sanctions_match", "pep_review"]
-      } } }}>
-      {expr("concat('Escalate to case (', count(filter(txns, t, t.flagged)), ' flagged, ', formatCurrency(sum(map(filter(txns, t, t.flagged), t, t.amount))), ')')")}
+      })}>
+      {`Escalate to case (${txns.filter(t => t.flagged).length} flagged, ${formatCurrency(sum(txns.filter(t => t.flagged).map(t => t.amount)))})`}
     </Button>
-    <Button on:event={{ click: { action: "requestKyc", args: { customer: "CUS-2841" } } }}>
+    <Button onClick={requestKyc({ customer: "CUS-2841" })}>
       Request updated KYC
     </Button>
   </Stack>

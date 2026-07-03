@@ -9,8 +9,12 @@
 import { type ExprAst, ExprError, type ExprValue, evalExprAst, exprAst } from './expr.js';
 import type { StateScope } from './resolve.js';
 
+/** One step after the root in a state path: a named field or a computed index. */
 export type StatePathSegment = { t: 'member'; prop: string } | { t: 'index'; idx: ExprAst };
 
+/** A parsed state path: a root identifier plus zero or more member/index
+ *  segments. Index segments carry their sub-AST so resolveStatePath can
+ *  evaluate them against the current scope. */
 export type StatePath = {
   /** The root identifier the path descends from. */
   root: string;

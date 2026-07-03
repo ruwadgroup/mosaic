@@ -1,21 +1,21 @@
 ```mosaic v=1 id=network-waterfall
-<Stack gap="4">
+<Stack>
   {/* A performance trace, made visible. The agent traced a page load and wants
       you to *see* the shape of it - a devtools-style waterfall - not read a
       paragraph about it. VegaChart carries the Gantt; a table carries the detail. */}
 
-  <Stack gap="1">
+  <Stack>
     <Heading>Page load - /checkout, cold cache</Heading>
     <Text tone="subtle">
       The nine requests the browser made to render the checkout page, in order, with when each started and how long it took.
     </Text>
   </Stack>
 
-  <Grid cols={12} gap="3">
-    <Stat slot:name="a" label="Total load"   value="642 ms" />
-    <Stat slot:name="b" label="Requests"     value="9" />
-    <Stat slot:name="c" label="Transferred"  value="1.2 MB" />
-    <Stat slot:name="d" label="On critical path" value="payment" tone="bad" />
+  <Grid cols={12}>
+    <Stat label="Total load"   value="642 ms" />
+    <Stat label="Requests"     value="9" />
+    <Stat label="Transferred"  value="1.2 MB" />
+    <Stat label="On critical path" value="payment" tone="bad" />
   </Grid>
 
   <VegaChart

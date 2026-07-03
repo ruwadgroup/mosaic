@@ -1,5 +1,5 @@
 ```mosaic v=1 id=test-results
-<Stack gap="4" state={{
+<Stack state={{
     failures: [
       { name: "billing/invoice.test.ts > prorates mid-cycle upgrades", ms: 412, flaky: false,
         excerpt: "AssertionError: expected 1867 to equal 1842\n  at billing/invoice.test.ts:148\n  amountDue was computed with the server timezone; the fixture assumes UTC" },
@@ -13,40 +13,42 @@
       flaky counts fold over the same failures array the cards render from,
       and the re-run button carries exactly those test names as intent args. */}
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Heading level={2}>Test results</Heading>
-    <Badge tone="bad">{expr("concat(count(failures), ' failed')")}</Badge>
-    <Badge tone="warn">{expr("concat(count(filter(failures, t, t.flaky)), ' known flaky')")}</Badge>
+    <Badge tone="bad">{`${failures.length} failed`}</Badge>
+    <Badge tone="warn">{`${failures.filter(t => t.flaky).length} known flaky`}</Badge>
   </Stack>
   <Text tone="subtle">vitest · 321 tests across 4 suites · run on fix/invoice-proration</Text>
 
-  <Grid cols={12} gap="3">
-    <Stat slot:name="a" label="Passed" value="318" tone="ok" />
-    <Stat slot:name="b" label="Failed" value={expr("count(failures)")} tone="bad" />
-    <Stat slot:name="c" label="Duration" value="41.2s" />
-    <Stat slot:name="d" label="Flaky" value={expr("count(filter(failures, t, t.flaky))")} tone="warn" />
+  <Grid cols={12}>
+    <Stat label="Passed" value="318" tone="ok" />
+    <Stat label="Failed" value={failures.length} tone="bad" />
+    <Stat label="Duration" value="41.2s" />
+    <Stat label="Flaky" value={failures.filter(t => t.flaky).length} tone="warn" />
   </Grid>
 
   <Tabs active="Failures" items={["Failures", "All suites", "Slowest"]}>
 
-    <Stack gap="3">
-      <List for:each="failures as t">
-        <Card key={expr("t.name")} gap="2">
-          <Stack direction="horizontal" gap="2">
-            <Badge tone="bad">failed</Badge>
-            <Badge if:show="t.flaky" tone="warn">flaky</Badge>
-            <Text weight="bold">{expr("t.name")}</Text>
-            <Text tone="subtle">{expr("concat(t.ms, ' ms')")}</Text>
-          </Stack>
-          <Code value={expr("t.excerpt")} />
-        </Card>
+    <Stack>
+      <List>
+        {failures.map(t => (
+          <Card key={t.name}>
+            <Stack direction="horizontal">
+              <Badge tone="bad">failed</Badge>
+              {t.flaky && <Badge tone="warn">flaky</Badge>}
+              <Text variant="label">{t.name}</Text>
+              <Text tone="subtle">{`${t.ms} ms`}</Text>
+            </Stack>
+            <Code value={t.excerpt} />
+          </Card>
+        ))}
       </List>
       <Text tone="subtle">
         The two flaky ones are timing races that pass on retry. The proration failure is deterministic - the fixture assumes UTC, the assertion does not.
       </Text>
     </Stack>
 
-    <Card gap="2">
+    <Card>
       <DataTable
         columns={["Suite", "Tests", "Failed", "Time"]}
         rows={[
@@ -70,16 +72,16 @@
 
   </Tabs>
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Button
-      tone="primary"
-      on:event={{ click: { action: "rerunFailed", args: {
-        count: expr("count(failures)"),
-        tests: expr("map(failures, t, t.name)")
-      } } }}>
-      {expr("concat('Re-run ', count(failures), ' failed')")}
+      variant="primary"
+      onClick={rerunFailed({
+        count: failures.length,
+        tests: failures.map(t => t.name)
+      })}>
+      {`Re-run ${failures.length} failed`}
     </Button>
-    <Button on:event={{ click: { action: "openTest", args: { file: "billing/invoice.test.ts", line: 148 } } }}>
+    <Button onClick={openTest({ file: "billing/invoice.test.ts", line: 148 })}>
       Open the proration failure
     </Button>
   </Stack>

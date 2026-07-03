@@ -7,8 +7,11 @@
 // tests are stable. A host that wants ELK-grade layout plugs its own Diagram
 // component in via opts.components.
 
+/** The position and size of one layout node (or group hull), in layout pixels. */
 export type DiagramLayoutRect = { id: string; x: number; y: number; w: number; h: number };
 
+/** One rendered edge with its routing polyline.
+ *  2 points = straight segment; 3 points = quadratic bezier (middle is the control). */
 export type DiagramLayoutEdge = {
   from: string;
   to: string;
@@ -16,6 +19,8 @@ export type DiagramLayoutEdge = {
   points: Array<{ x: number; y: number }>;
 };
 
+/** The complete output of layoutDiagram: node/group rects, edge polylines, and
+ *  the canvas size. All coordinates are in layout pixels; the host SVG scales them. */
 export type DiagramLayout = {
   width: number;
   height: number;

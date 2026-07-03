@@ -47,7 +47,7 @@ A path that is not `ident`/member/index-shaped (a call, arithmetic outside `[…
 | `on:event`    | `{ event: action }` map                 | Fires an action on an event - see [Events](#events)                    |
 | `key`         | string or `expr("…")`                   | Stable identity for list-child diffing                                 |
 
-Three more names - `theme:scope`, `slot:name`, `from:ref` - are reserved in the grammar for future capabilities and carry no semantics yet; do not write them.
+Two more names - `slot:name`, `from:ref` - are reserved in the grammar for future capabilities and carry no semantics yet; do not write them.
 
 ### Binds
 
@@ -88,16 +88,17 @@ Set `key` on repeating children when items can reorder, so renderers diff by ide
 `on:event` maps event names to actions.
 An action is one of exactly two things ([proposal §6.3](proposal.md#63-events)):
 
-**A local state mutation** - applied by Mosaic to its own store, no round-trip:
+**A local state mutation** - applied by Mosaic to its own store, no round-trip.
+In mosaic-jsx these are `set(path, expression)` and `toggle(path)`; in the IR they are action records:
 
 ```jsx
-<Button on:event={{ click: "state.set('view', 'grid')" }}>Grid</Button>
-<Button on:event={{ click: "state.toggle('files[2].checked')" }}>Toggle</Button>
+<Button on:event={{ click: { action: "state.set", args: { path: "view", value: "grid" } } }}>Grid</Button>
+<Button on:event={{ click: { action: "state.set", args: { path: "count", value: expr("count + 1") } } }}>+1</Button>
+<Button on:event={{ click: { action: "state.toggle", args: { path: "files[2].checked" } } }}>Toggle</Button>
 ```
 
-`state.set(path, value)` takes a path and a **literal** value - `true`, `false`, `null`, a number, or a quoted string.
-To hand over a computed value, use an intent with `expr` args, or bind the control instead.
-`state.toggle(path)` negates the boolean at the path.
+`set(path, value)` takes a path and **any bounded expression** - a literal, `count + 1`, `display + "7"` - evaluated against current state at event time, which is what makes counters and working calculators possible ([`examples/tip-splitter.mosaic`](../examples/tip-splitter.mosaic)).
+`toggle(path)` negates the boolean at the path.
 
 **A named host intent** - handed to the host, and that is where Mosaic stops:
 
@@ -115,11 +116,11 @@ To hand over a computed value, use an intent with `expr` args, or bind the contr
 </Button>
 ```
 
-The host's `onAction(action, args)` receives the intent.
+The host's `onIntent(name, args)` receives the intent.
 `expr` values in `args` are resolved against current state **before** dispatch, so the host receives the computed total, never a raw expression or stale state.
 What the intent means - call a tool, start a turn, navigate - is entirely the host's policy ([invariant 3](../ARCHITECTURE.md#invariants)).
 
-Anything that is not `state.set(…)` or `state.toggle(…)` dispatches as an intent, so `on:event={{ click: "refresh" }}` is shorthand for `{ action: "refresh" }`.
+Any other action dispatches as an intent, so `on:event={{ click: "refresh" }}` is shorthand for `{ action: "refresh" }`.
 
 ## Non-interactive surfaces
 

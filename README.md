@@ -4,7 +4,8 @@
 
 ### AI thoughts, made visible
 
-**Some thinking is easier to see than to read. Mosaic lets an agent turn its thinking into an interface your app renders natively, in your own look.**
+**Many of what you ask an agent for is really a picture.
+Mosaic is a format that lets the agent build that picture from general blocks, and lets your app render it as native UI in your own look.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Proposal](https://img.shields.io/badge/proposal-founding-7c7cff.svg)](docs/proposal.md)
@@ -13,146 +14,159 @@
 
 </div>
 
-Mosaic is for people building AI apps - Claude Code, t3-code, Codex, Cursor, and the like.
+A migration plan is a timeline with the risks beside it.
+A build-versus-buy answer is a table that shifts depending on who's asking.
+A pricing question is a slider you want to drag.
+The agent has all of that in mind, then flattens it into paragraphs, because prose is the only thing it can hand your app.
 
-A lot of what an agent produces is spatial: a plan, a comparison, a dashboard, a calculator, a chart that visualizes the data.
-A picture of that thinking is easier for a person to take in than paragraphs describing it.
-Mosaic lets an agent express its thinking as a real interface, and lets your app render it natively.
+Mosaic is a format for the picture that gets lost.
+The agent arranges an interface out of general building blocks, the tiles, and your app draws them with its own components.
+That's the name: small, general pieces the agent composes into whatever it needs to show you.
 
-The agent writes **Mosaic** - a small JSX pattern, composed from general building blocks.
-It compiles to a canonical **IR** your renderer turns into UI, styled by you.
-Interactivity is local: a slider can drive a computed total, a section can appear when a condition holds.
-Everything an agent emits is data, so your host stays in control of what runs.
+## The gap it fills
 
-## What it's for
+There are already two ways to get an interface out of an agent, and each makes you give something up.
 
-The things an agent is constantly asked to do are spatial: **plan** a migration, **mock** a screen before you build it, **compare** the options, **show** you a trace instead of describing it.
-Today that comes back as prose. Mosaic lets the agent hand your app a real interface instead - composed from general blocks, styled by you.
+You can build the components yourself and let the agent pick among them.
+Safe, and it looks like your app, but the agent is stuck with the widgets you thought of first.
+This is [A2UI](https://a2ui.org) and Vercel's generative UI: a catalog the agent chooses from but never composes beyond.
 
-**Compare** - an opinionated landscape, laid out to read at a glance, that re-scores itself for who you are when you flip the audience:
+Or you can let the agent write real code and run it, the way Claude Artifacts and v0 do.
+Now it can build anything, but what comes back is code: you run it in a sandbox, in a look you can't restyle, as a small app boxed inside a frame your product can't reach into.
+
+Mosaic takes the good half of each.
+The agent composes as freely as it would with code, but never writes code (or atleast not HTML,CSS,JS).
+It writes a description made of general blocks, and that description is plain data your app renders with its own components.
+So the agent invents anything, the result always looks like your product, and there's no sandbox, because there's nothing to run.
+
+The interface is alive, too, without going back to the model.
+A small, safe expression language lets a slider drive a total, a section appear when a value crosses a line, a list filter itself, all computed on the page.
+Drag the slider and the price updates on the spot. No round-trip, no code.
+
+## See it
+
+The agent comparing memory layers.
+Flip the audience at the bottom and the verdict rewrites itself, right there, with no trip back to the model.
 
 ```jsx
-<Stack gap="3" state={{ audience: "SaaS" }}>
-  <Card gap="2">
-    <Stack direction="horizontal" gap="2">
+<Stack state={{ audience: "SaaS" }}>
+  <Card>
+    <Stack direction="horizontal">
       <Heading level={3}>Mem0</Heading>
       <Badge tone="warn">partial fit</Badge>
     </Stack>
     <Text>Fastest path to "it remembers things" - but recall quality drifts as the store grows.</Text>
   </Card>
-  <Card gap="2">
-    <Stack direction="horizontal" gap="2">
+  <Card>
+    <Stack direction="horizontal">
       <Heading level={3}>Zep / Graphiti</Heading>
       <Badge tone="ok">strong fit</Badge>
     </Stack>
     <Text>Temporal knowledge graph. Leads on "what did we believe on the 8th?" - but you adopt a service, not a library.</Text>
   </Card>
 
-  <SegmentedControl bind:state="audience" options={["SaaS", "Bank"]} />
-  <Callout if:show="audience == 'SaaS'" tone="ok">
-    Zep wins here: point-in-time recall without a graph of your own to operate.
-  </Callout>
-  <Callout if:show="audience == 'Bank'" tone="warn">
-    Neither survives an audit alone - provenance has to live in your own database.
-  </Callout>
+  <SegmentedControl value={audience} options={["SaaS", "Bank"]} />
+  {audience == 'SaaS' && (
+    <Callout tone="ok">
+      Zep wins here: point-in-time recall without a graph of your own to operate.
+    </Callout>
+  )}
+  {audience == 'Bank' && (
+    <Callout tone="warn">
+      Neither survives an audit alone - provenance has to live in your own database.
+    </Callout>
+  )}
 </Stack>
 ```
 
-`tone="ok"` is a theme token; the host resolves the color, so the verdict looks like your app.
-And the flip is local: `if:show` swaps the verdict when the segmented control changes, with no round-trip to the model.
+The agent never names a color.
+It writes `tone="ok"`, and your app maps that to whatever green it already uses, so the verdict looks like it belonged there all along.
 
-**Mock** a screen whose numbers are _real_. A control drives a derived value through a small, bounded expression language, and it recomputes locally as you drag - no code, no round-trip:
+A pricing page whose numbers are real: drag the slider and the total recomputes as you go.
 
 ```jsx
-<Card gap="3" state={{ seats: 12, annual: true }}>
-  <Field label={expr("concat('Seats: ', seats)")}>
-    <Slider bind:state="seats" min={1} max={200} />
+<Card state={{ seats: 12, annual: true }}>
+  <Field label={`Seats: ${seats}`}>
+    <Slider value={seats} min={1} max={200} />
   </Field>
-  <Toggle bind:state="annual" label="Bill annually (save 20%)" />
+  <Toggle checked={annual} label="Bill annually (save 20%)" />
   <Stat
-    label={expr("annual ? 'Billed today (12 mo)' : 'Billed monthly'")}
-    value={expr("formatCurrency(seats * 16 * (annual ? 12 * 0.8 : 1))")} />
-  <Callout if:show="seats >= 100" tone="warn">Above 100 seats, Enterprise usually wins.</Callout>
+    label={annual ? "Billed today (12 mo)" : "Billed monthly"}
+    value={formatCurrency(seats * 16 * (annual ? 12 * 0.8 : 1))} />
+  {seats >= 100 && <Callout tone="warn">Above 100 seats, Enterprise usually wins.</Callout>}
 
-  <Button tone="primary" on:event={{ click: { action: "startCheckout", args: {
-    seats: expr("seats"),
-    total: expr("seats * 16 * (annual ? 12 * 0.8 : 1)")
-  } } }}>
+  <Button variant="primary" onClick={startCheckout({
+    seats: seats,
+    total: seats * 16 * (annual ? 12 * 0.8 : 1)
+  })}>
     Continue to checkout
   </Button>
 </Card>
 ```
 
-Only what leaves the artifact - the "Continue to checkout" - crosses to the host, through an explicit `on:event` intent that carries the _computed_ total, not raw state.
+Everything but the click stays inside the page.
+The click leaves as a plain event carrying the final total, and what happens next is your app's call.
 
 ## How it works
 
-Two things, one contract between them:
+Two ideas, one line between them.
 
-- **Mosaic** is the JSX pattern the model writes - the only surface anyone authors.
-- **The IR** is the canonical tree Mosaic compiles to - the format's identity, serialized to JSON for storage and the MCP payload.
-- **Frameworks** turn the IR into a surface. `mosaic-react` is the reference we ship in TypeScript; another stack builds its own framework against the same IR.
+The agent writes **Mosaic** - standard, natural JSX - because writing JSX is second nature to a model and cheap in tokens.
+Nothing in it executes: braces hold a bounded, interpreted expression subset, and the compiler lowers everything to plain data.
+It compiles, one way, into an **IR**: a plain tree of data.
+The IR is the real format, the thing you store and send and render against; the JSX is just the pen.
 
-Compilation is one-way - `Mosaic -> IR -> render` - and the IR, not the JSX, is the contract you build against.
+Your app renders every block with its own components, so `Card`, `Button`, and `Slider` look the way they do everywhere else in your product.
+The agent writes names, never styles: `tone="warn"`, `variant="label"`, and your app decides what they mean.
+The `expr` language covers derived values, conditions, and lists, and nothing more, so it computes but can't loop forever, reach out, or become a program.
+It even renders while it's still streaming, the way the model streams a sentence.
 
-Every block is rendered by **your** components: Mosaic is the standard - the block vocabulary and semantic tokens like `tone="warn"` the agent writes - and your renderer decides what each block actually looks like.
-The tokens are names, never values: your renderer maps `tone="warn"` or `gap="3"` onto your design system, and the agent never writes a raw style.
-The **`expr`** language gives an agent derived values, conditionals, and lists over local state; it is bounded and interpreted, so it computes but cannot loop forever or reach out.
-For interop, Mosaic delivers over MCP: a tool returns the IR as a `ui://` resource an aware host renders natively. The core also works with no MCP at all.
+We ship `mosaic-react` as the reference renderer, but any stack reads the same IR.
+To draw Mosaic somewhere else, SwiftUI, Compose, Flutter, a terminal, you write a `NodeVisitor` against `mosaic-core`'s `walk()`; `mosaic-react` is the worked example.
 
-## The packages
+| Package                                    | What it is                                                                                                                                         |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`mosaic-core`](packages/ts/mosaic-core)   | The compiler and the IR, plus validate, resolve, the `expr` evaluator, streaming parsing, `walk()`, and the block registry.                        |
+| [`mosaic-react`](packages/ts/mosaic-react) | The headless React runtime: `<Mosaic components onIntent>` turns the IR into React through the host's own components.                              |
+| [`mosaic-ansi`](packages/ts/mosaic-ansi)   | A text renderer, and the fallback that lets any surface read a Mosaic even when it can't draw the rich version.                                    |
+| [`mosaic-ai`](packages/ts/mosaic-ai)       | The AI tool adapters: neutral `mosaic_ls`/`mosaic_cat`/`mosaic_validate` descriptors, plus `/vercel`, `/mcp`, and `/prompt` bindings.              |
 
-| Package                                    | Responsibility                                                                                                                                 |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`mosaic-core`](packages/ts/mosaic-core)   | The Mosaic compiler (`Mosaic -> IR`), the IR, validate, resolve, the `expr` evaluator, `walk()`, the block registry, and the Host Manifest.    |
-| [`mosaic-react`](packages/ts/mosaic-react) | The reference web framework - `render(source, { manifest, onAction })` over the IR.                                                            |
-| [`mosaic-mcp`](packages/ts/mosaic-mcp)     | Optional delivery: `ui://` resources, the MCP-Apps bridge, and `on:event` relay.                                                               |
-| [`mosaic-ansi`](packages/ts/mosaic-ansi)   | A text renderer, and the `decomposeTo` floor for surfaces that can't draw a rich component.                                                    |
+The artifact travels inline - a ```` ```mosaic ```` fence in the model's reply that the host's message renderer draws natively; MCP (or any tools API) carries only the three introspection tools.
+[ARCHITECTURE.md](ARCHITECTURE.md) has the full design.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
-To render on another stack - SwiftUI, Compose, Flutter, a TUI - implement a `NodeVisitor` against `mosaic-core`'s `walk()`; `mosaic-react` is the worked example.
-
-## See it
+## Try it
 
 ```bash
 pnpm install && pnpm build && pnpm demo
 ```
 
-That opens the [demo](demo/): a full agent-workspace app where every assistant reply is a live Mosaic artifact rendered by the app's own component kit.
-Threads cover the real jobs - reviewing a diff before commit, approving a command, picking a model, reading test results - and every intent visibly does something: sliders drive derived totals, filters re-shape lists, and buttons hand the host computed args.
+That opens the [demo](demo/): a full agent workspace where every reply is a live Mosaic, rendered by the app's own components.
+The threads are real jobs, reviewing a diff, approving a command, picking a model, reading test results, and everything does something: sliders drive totals, filters reshape lists, buttons hand your app the numbers they computed.
 
-The [`examples/`](examples) directory has the complete, hand-written `.mosaic` files, each one a job an agent actually does:
+If you'd rather read than run, [`examples/`](examples) has the hand-written files, one per job an agent actually does:
 
-- [`compare-memory-layer.mosaic`](examples/compare-memory-layer.mosaic) - **compare**: an opinionated product landscape that re-scores for your audience.
-- [`pricing-estimator.mosaic`](examples/pricing-estimator.mosaic) - **mock UI**: a pricing page whose every figure is a live `expr`.
-- [`plan-migration.mosaic`](examples/plan-migration.mosaic) - **plan**: a migration with a task list that filters live by owner.
-- [`request-path.mosaic`](examples/request-path.mosaic) - **explain**: a clickable architecture flow, drawn not described.
-- [`network-waterfall.mosaic`](examples/network-waterfall.mosaic) - **visualize**: a page-load trace as a real waterfall.
+- [`compare-memory-layer.mosaic`](examples/compare-memory-layer.mosaic) - a product comparison that re-scores for your audience.
+- [`pricing-estimator.mosaic`](examples/pricing-estimator.mosaic) - a pricing page where every figure is live.
+- [`plan-migration.mosaic`](examples/plan-migration.mosaic) - a migration plan whose task list filters by owner.
+- [`request-path.mosaic`](examples/request-path.mosaic) - an architecture flow you click through instead of read.
+- [`network-waterfall.mosaic`](examples/network-waterfall.mosaic) - a page-load trace drawn as a real waterfall.
 
-See the [examples README](examples/README.md) for the full set and how to read them.
+## Where to go next
 
-## Where to read
+- **[docs/react.md](docs/react.md)** - render your first artifact in about five minutes. The [docs index](docs/README.md) has the rest: the language, the blocks, state, `expr`, rendering, and MCP.
+- **[docs/proposal.md](docs/proposal.md)** - the full proposal, and the definition of the format.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - the design and the invariants any implementation keeps.
+- **[schema/](schema)** - the JSON Schemas. **[skills/](skills)** - the skill that teaches an agent to emit Mosaic. **[packages/](packages)** - the TypeScript reference.
 
-- **[docs/getting-started.md](docs/getting-started.md)** - render an artifact in five minutes; the [docs index](docs/README.md) has the full reference set (language, blocks, state, `expr`, rendering, MCP).
-- **[docs/proposal.md](docs/proposal.md)** - the full technical proposal; the definition of the format, cited by section number.
-- **[docs/design-history.md](docs/design-history.md)** - the origin story, in my own words.
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - the intended design and the invariants an implementation preserves.
-- **[ROADMAP.md](ROADMAP.md)** - the staged build order.
-- **[schema/](schema)** - the JSON Schemas.
-- **[skills/](skills)** - the attachable agent skill that teaches a model to emit Mosaic; a template hosts edit to mirror their manifest.
-- **[packages/](packages)** - the reference implementation (TypeScript).
+## Standing on
 
-## Built on
-
-Mosaic stands on work that came before it:
-
-- **[A2UI](https://a2ui.org)** - declarative local interaction driven by the client, not the network.
-- **[MCP Apps / SEP-1865](https://modelcontextprotocol.io)** - the delivery transport Mosaic uses to reach a host.
-- **[safe-mdx](https://github.com/remorses/safe-mdx)** - rendering JSX-shaped input as data.
-- **[CEL](https://github.com/google/cel-spec)** and spreadsheet formulas - the bounded, safe expression model behind `expr`.
+- **[A2UI](https://a2ui.org)**, the closest neighbor: declarative, agent-driven UI rendered natively instead of run as code.
+- **[Model Context Protocol](https://modelcontextprotocol.io)**, one of the tool transports that carry Mosaic's introspection tools to a model.
+- **[safe-mdx](https://github.com/remorses/safe-mdx)**, which showed JSX-shaped input can be treated as plain data.
+- **[CEL](https://github.com/google/cel-spec)** and spreadsheet formulas, the model behind a safe, bounded `expr`.
 
 ## Contributing
 
-The scope and core design are kept tight while they take shape.
-You're welcome to read, open an issue to discuss the design, or file a bug.
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+The scope and core design are kept deliberately tight while they settle.
+You're welcome to read along, open an issue to talk through the design, or report a bug.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the details.

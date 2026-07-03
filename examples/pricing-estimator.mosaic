@@ -1,49 +1,53 @@
 ```mosaic v=1 id=pricing-estimator
-<Stack gap="4" state={{ plan: "Pro", seats: 12, annual: true, support: false }}>
+<Stack state={{ plan: "Pro", seats: 12, annual: true, support: false }}>
   {/* Mock a pricing page whose numbers are real. Every figure here is a derived
       value: change the plan, drag the seats, toggle annual, and the totals, the
-      savings, and the comparison chart all recompute locally through expr - no
-      code, no round-trip. The egg-slider grown up into a real screen. */}
+      savings, and the comparison chart all recompute locally - no code, no
+      round-trip. The egg-slider grown up into a real screen. */}
 
-  <Stack gap="1">
+  <Stack>
     <Heading>Estimate your plan</Heading>
     <Text tone="subtle">Adjust the inputs; the price updates as you go. Annual billing takes 20% off.</Text>
   </Stack>
 
-  <Grid cols={12} gap="4">
+  <Grid cols={12}>
 
     {/* Inputs */}
-    <Card slot:name="controls" gap="3">
+    <Card>
       <Field label="Plan">
-        <SegmentedControl bind:state="plan" options={["Starter", "Pro", "Enterprise"]} />
+        <SegmentedControl value={plan} options={["Starter", "Pro", "Enterprise"]} />
       </Field>
-      <Field label={expr("concat('Seats: ', seats)")}>
-        <Slider bind:state="seats" min={1} max={200} step={1} />
+      <Field label={`Seats: ${seats}`}>
+        <Slider value={seats} min={1} max={200} step={1} />
       </Field>
-      <Toggle bind:state="annual" label="Bill annually (save 20%)" />
-      <Toggle bind:state="support" label="Add priority support (+$99/mo)" />
+      <Toggle checked={annual} label="Bill annually (save 20%)" />
+      <Toggle checked={support} label="Add priority support (+$99/mo)" />
       <Text tone="subtle">
-        {expr("concat(plan, ' is ', formatCurrency(plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40), ' per seat / month')")}
+        {`${plan} is ${formatCurrency(plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40)} per seat / month`}
       </Text>
     </Card>
 
     {/* Live summary */}
-    <Card slot:name="summary" gap="3">
+    <Card>
       <Stat
-        label={expr("annual ? 'Billed today (12 mo)' : 'Billed monthly'")}
-        value={expr("annual ? formatCurrency((seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) * 12 * 0.8) : formatCurrency(seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0))")} />
+        label={annual ? 'Billed today (12 mo)' : 'Billed monthly'}
+        value={annual ? formatCurrency((seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) * 12 * 0.8) : formatCurrency(seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0))} />
 
-      <Stack direction="horizontal" gap="4">
-        <Stat label="Per month" value={expr("formatCurrency(seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0))")} />
-        <Stat label="Per seat / mo" value={expr("formatCurrency((seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) / seats)")} />
+      <Stack direction="horizontal">
+        <Stat label="Per month" value={formatCurrency(seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0))} />
+        <Stat label="Per seat / mo" value={formatCurrency((seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) / seats)} />
       </Stack>
 
-      <Callout if:show="annual" tone="ok">
-        {expr("concat('Annual billing saves you ', formatCurrency((seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) * 12 * 0.2), ' a year.')")}
-      </Callout>
-      <Callout if:show="seats >= 100 && plan != 'Enterprise'" tone="warn">
-        Above 100 seats, Enterprise usually wins on total cost and adds SSO. Worth comparing.
-      </Callout>
+      {annual && (
+        <Callout tone="ok">
+          {`Annual billing saves you ${formatCurrency((seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) * 12 * 0.2)} a year.`}
+        </Callout>
+      )}
+      {seats >= 100 && plan != 'Enterprise' && (
+        <Callout tone="warn">
+          Above 100 seats, Enterprise usually wins on total cost and adds SSO. Worth comparing.
+        </Callout>
+      )}
     </Card>
   </Grid>
 
@@ -52,22 +56,22 @@
   <Chart
     type="bar"
     alt="Annual cost of each plan at the currently selected seat count and options, so you can see which tier is cheapest at your size."
-    series={[{ name: "Annual cost", points: [
-      ["Starter",    expr("(seats * 8  + (support ? 99 : 0)) * 12 * (annual ? 0.8 : 1)")],
-      ["Pro",        expr("(seats * 16 + (support ? 99 : 0)) * 12 * (annual ? 0.8 : 1)")],
-      ["Enterprise", expr("(seats * 40 + (support ? 99 : 0)) * 12 * (annual ? 0.8 : 1)")]
-    ]}]} />
+    data={[
+      { label: "Starter",    value: (seats * 8  + (support ? 99 : 0)) * 12 * (annual ? 0.8 : 1) },
+      { label: "Pro",        value: (seats * 16 + (support ? 99 : 0)) * 12 * (annual ? 0.8 : 1) },
+      { label: "Enterprise", value: (seats * 40 + (support ? 99 : 0)) * 12 * (annual ? 0.8 : 1) }
+    ]} />
 
   <Button
-    tone="primary"
-    on:event={{ click: { action: "startCheckout", args: {
-      plan: expr("plan"),
-      seats: expr("seats"),
-      billing: expr("annual ? 'annual' : 'monthly'"),
-      support: expr("support"),
-      total: expr("(seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) * (annual ? 12 * 0.8 : 1)")
-    } } }}>
-    {expr("concat('Continue with ', plan, ' - ', seats, ' seats')")}
+    variant="primary"
+    onClick={startCheckout({
+      plan: plan,
+      seats: seats,
+      billing: annual ? 'annual' : 'monthly',
+      support: support,
+      total: (seats * (plan == 'Starter' ? 8 : plan == 'Pro' ? 16 : 40) + (support ? 99 : 0)) * (annual ? 12 * 0.8 : 1)
+    })}>
+    {`Continue with ${plan} - ${seats} seats`}
   </Button>
 
 </Stack>

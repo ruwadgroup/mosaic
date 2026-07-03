@@ -1,0 +1,37 @@
+```mosaic v=1 id=tip-splitter
+<Card state={{ bill: 86, tip: 10, people: 2 }}>
+  {/* A working calculator: every button writes a computed value back into
+      state with set(path, expression), and the totals re-derive locally.
+      clamp() keeps the steppers inside sensible bounds. */}
+  <Heading level={3}>Split the bill</Heading>
+
+  <Text variant="label">Bill</Text>
+  <Stack direction="horizontal" align="center">
+    <Button onClick={set(bill, clamp(bill - 5, 0, 500))}>-5</Button>
+    <Stat label="on the table" value={formatCurrency(bill)} />
+    <Button onClick={set(bill, clamp(bill + 5, 0, 500))}>+5</Button>
+  </Stack>
+
+  <Text variant="label">Tip</Text>
+  <Stack direction="horizontal">
+    <Button variant={tip == 0 ? "primary" : "secondary"} onClick={set(tip, 0)}>0%</Button>
+    <Button variant={tip == 10 ? "primary" : "secondary"} onClick={set(tip, 10)}>10%</Button>
+    <Button variant={tip == 15 ? "primary" : "secondary"} onClick={set(tip, 15)}>15%</Button>
+    <Button variant={tip == 20 ? "primary" : "secondary"} onClick={set(tip, 20)}>20%</Button>
+  </Stack>
+
+  <Text variant="label">People</Text>
+  <Stack direction="horizontal" align="center">
+    <Button onClick={set(people, clamp(people - 1, 1, 20))}>-</Button>
+    <Text>{people} {people == 1 ? "person" : "people"}</Text>
+    <Button onClick={set(people, clamp(people + 1, 1, 20))}>+</Button>
+  </Stack>
+
+  <Divider />
+  <Stack direction="horizontal" justify="between">
+    <Stat label="Total with tip" value={formatCurrency(bill * (1 + tip / 100))} />
+    <Stat label="Each pays" value={formatCurrency((bill * (1 + tip / 100)) / people)} tone="primary" />
+  </Stack>
+  {tip == 0 && <Callout tone="warn">Stiffing the staff? Rethink the 0%.</Callout>}
+</Card>
+```

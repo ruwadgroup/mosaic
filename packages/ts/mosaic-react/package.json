@@ -1,7 +1,7 @@
 {
-  "name": "@mosaic/react",
-  "version": "0.0.0",
-  "description": "The reference React renderer for Mosaic. Web. The worked example builders copy for their own stack.",
+  "name": "@mosaicjs/react",
+  "version": "0.8.0",
+  "description": "The headless React runtime for Mosaic: typed components, schema coercion, streaming, diagnostics, intents.",
   "license": "MIT",
   "author": "Tamim Bin Hakim <tamimbinhakim.work@gmail.com>",
   "type": "module",
@@ -15,7 +15,7 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": ["LICENSE", "dist", "README.md"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -23,7 +23,7 @@
     "clean": "rm -rf dist .tsbuildinfo"
   },
   "dependencies": {
-    "@mosaic/core": "workspace:*"
+    "@mosaicjs/core": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18",

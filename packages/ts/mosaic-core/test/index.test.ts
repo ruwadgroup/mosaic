@@ -3,13 +3,13 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_MANIFEST,
-  DEFAULT_THEME,
+  DEFAULT_REGISTRY,
   type ExprValue,
   MOSAIC_MEDIA_TYPE,
   MOSAIC_VERSION,
+  type MosaicDocument,
   type MosaicNode,
   type NodeVisitor,
-  blockSpec,
   compactManifest,
   evalExpr,
   exprDependencies,
@@ -21,7 +21,6 @@ import {
   readStatePath,
   resolve,
   resolveStatePath,
-  resolveToken,
   serialize,
   validate,
   walk,
@@ -31,15 +30,10 @@ import {
 const EXAMPLES_DIR = join(import.meta.dirname, '../../../../examples');
 const exampleFiles = readdirSync(EXAMPLES_DIR).filter((f) => f.endsWith('.mosaic'));
 
-describe('@mosaic/core', () => {
+describe('@mosaicjs/core', () => {
   it('pins the spec version and media type', () => {
     expect(MOSAIC_VERSION).toBe('1.0');
     expect(MOSAIC_MEDIA_TYPE).toBe('application/vnd.mosaic+json');
-  });
-
-  it('resolveToken reads a renderer theme', () => {
-    expect(resolveToken(DEFAULT_THEME, 'color.accent')).toBe('#7c7cff');
-    expect(resolveToken(DEFAULT_THEME, 'space.4')).toBe(16);
   });
 
   it('compactManifest summarizes capabilities', () => {
@@ -51,28 +45,30 @@ describe('@mosaic/core', () => {
 });
 
 describe('the compiler', () => {
-  it('parses an element with props, directives, and children', () => {
+  it('parses an element with props, a conditional child, and text', () => {
     const result = parse(
-      '<Card gap="3"><Text if:show="eggs > 60" tone="warn">Bulk order</Text></Card>',
+      '<Card tone="ok">{eggs > 60 && <Text tone="warn">Bulk order</Text>}</Card>',
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const card = result.doc.root;
     expect(card.type).toBe('Card');
-    expect(card.props).toEqual({ gap: '3' });
+    expect(card.props).toEqual({ tone: 'ok' });
     const text = card.children?.[0] as MosaicNode;
     expect(text.directives?.['if:show']).toBe('eggs > 60');
     expect(text.children?.[0]?.props?.value).toBe('Bulk order');
   });
 
-  it('compiles expr() and token() to refs, not code', () => {
-    const result = parse(
-      '<Stat label="Total" value={expr("eggs * 0.5")} accent={token("color.accent")} />',
-    );
+  it('compiles brace expressions to refs, not code; token(...) is gone from the language', () => {
+    const result = parse('<Stat label="Total" value={eggs * 0.5} />');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.doc.root.props?.value).toEqual({ $expr: 'eggs * 0.5' });
-    expect(result.doc.root.props?.accent).toEqual({ $token: 'color.accent' });
+
+    const token = parse('<Stat label="Total" value={0} accent={token("color.accent")} />');
+    expect(token.ok).toBe(false);
+    if (token.ok) return;
+    expect(token.errors[0]?.code).toBe('UNKNOWN_FUNCTION');
   });
 
   it('rejects lowercase HTML tags at compile time', () => {
@@ -82,16 +78,16 @@ describe('the compiler', () => {
     expect(result.errors[0]?.code).toBe('LOWERCASE_TAG');
   });
 
-  it('rejects code in braces: arrow functions, identifiers, member access', () => {
-    for (const src of [
-      '<Button on:event={{ click: handler }} />',
-      '<Text size={x.y} />',
-      '<Stat value={eggs * 2} />',
-    ]) {
+  it('rejects what would make braces a language: assignment, unknown calls, stray arrows', () => {
+    for (const [src, code] of [
+      ['<Stat value={seats = 3} />', 'INVALID_EXPRESSION'],
+      ['<Stat value={fetchData()} />', 'UNKNOWN_FUNCTION'],
+      ['<Stat value={(x) => x} />', 'INVALID_ARROW'],
+    ] as const) {
       const result = parse(src);
       expect(result.ok, src).toBe(false);
       if (result.ok) continue;
-      expect(result.errors[0]?.code).toBe('CODE_IN_BRACES');
+      expect(result.errors[0]?.code, src).toBe(code);
     }
   });
 
@@ -109,7 +105,7 @@ describe('the compiler', () => {
   });
 
   it('serialization is canonical: stable across key order', () => {
-    const a = parse('<Card gap="2" pad="3"><Text>x</Text></Card>');
+    const a = parse('<Badge tone="ok" icon="circle-check"><Text>x</Text></Badge>');
     expect(a.ok).toBe(true);
     if (!a.ok) return;
     const json = serialize(a.doc);
@@ -117,7 +113,7 @@ describe('the compiler', () => {
     expect(reparsed.ok).toBe(true);
     if (!reparsed.ok) return;
     expect(serialize(reparsed.doc)).toBe(json);
-    expect(json.indexOf('"gap"')).toBeLessThan(json.indexOf('"pad"'));
+    expect(json.indexOf('"icon"')).toBeLessThan(json.indexOf('"tone"'));
   });
 });
 
@@ -249,24 +245,47 @@ describe('validate / resolve / walk', () => {
     expect(result.errors[0]?.code).toBe('MISSING_REQUIRED_PROP');
   });
 
-  it('flags unknown tags and bad exprs', () => {
+  it('flags unknown tags, removed directives, and bad exprs in the IR', () => {
     const unknown = validate(loadMosaic('<RiskTable />'), { ...DEFAULT_MANIFEST, strict: true });
     expect(unknown.ok).toBe(false);
-    const badExpr = validate(loadMosaic('<Text if:show="1 +">x</Text>'), DEFAULT_MANIFEST);
+    const themed = validate(
+      {
+        mosaic_version: MOSAIC_VERSION,
+        id: 'themed',
+        root: {
+          type: 'Text',
+          directives: { 'theme:scope': 'dark' } as MosaicNode['directives'],
+        },
+      },
+      DEFAULT_MANIFEST,
+    );
+    expect(themed.ok).toBe(false);
+    if (!themed.ok) {
+      expect(themed.errors[0]?.code).toBe('INVALID_DIRECTIVE');
+    }
+    const badExpr = validate(
+      {
+        mosaic_version: MOSAIC_VERSION,
+        id: 'bad',
+        root: { type: 'Text', directives: { 'if:show': '1 +' } },
+      },
+      DEFAULT_MANIFEST,
+    );
     expect(badExpr.ok).toBe(false);
   });
 
   it('the egg-slider works end to end', () => {
     const doc = loadMosaic(`
-      <Card gap="3" state={{ eggs: 80 }}>
-        <Slider label="Number of eggs" bind:state="eggs" min={0} max={144} step={1} />
-        <Text size="xl">Total: {expr("formatCurrency(eggs * 0.50)")}</Text>
-        <Text if:show="eggs > 60" tone="warn">Bulk order</Text>
-        <Button on:event={{ click: { action: "order", args: { total: expr("eggs * 0.50") } } }}>
+      <Card state={{ eggs: 80 }}>
+        <Slider label="Number of eggs" value={eggs} min={0} max={144} step={1} />
+        <Text>Total: {formatCurrency(eggs * 0.50)}</Text>
+        {eggs > 60 && <Text tone="warn">Bulk order</Text>}
+        <Button onClick={order({ total: eggs * 0.50 })}>
           Place order
         </Button>
       </Card>`);
     expect(validate(doc, DEFAULT_MANIFEST).ok).toBe(true);
+    expect(doc.root.children?.[0]?.directives?.['bind:state']).toBe('eggs');
 
     const resolved = resolve(doc, DEFAULT_MANIFEST);
     const texts: string[] = [];
@@ -295,19 +314,20 @@ describe('validate / resolve / walk', () => {
     expect(retailTexts.join(' ')).not.toContain('Bulk order');
   });
 
-  it('for:each expands with the item in scope', () => {
+  it('map children expand with the item in scope', () => {
     const doc = loadMosaic(`
       <Stack state={{ rows: [{ name: "a" }, { name: "b" }] }}>
-        <Text for:each="rows as row">{expr("row.name")}</Text>
+        {rows.map(row => <Text>{row.name}</Text>)}
       </Stack>`);
+    expect(doc.root.children?.[0]?.directives?.['for:each']).toBe('rows as row');
     const resolved = resolve(doc, DEFAULT_MANIFEST);
     expect(resolved.root.children).toHaveLength(2);
   });
 
-  it('for:each binds the optional zero-based index: "rows as row, i"', () => {
+  it('map children bind the optional zero-based index: (row, i)', () => {
     const doc = loadMosaic(`
       <Stack state={{ rows: [{ name: "a" }, { name: "b" }] }}>
-        <Text for:each="rows as row, i">{expr("concat(i, ':', row.name)")}</Text>
+        {rows.map((row, i) => <Text>{\`\${i}:\${row.name}\`}</Text>)}
       </Stack>`);
     expect(validate(doc, DEFAULT_MANIFEST).ok).toBe(true);
     const texts: string[] = [];
@@ -325,7 +345,7 @@ describe('validate / resolve / walk', () => {
   it('resolve rewrites bind:state to the concrete path; the stored IR keeps the authored one', () => {
     const doc = loadMosaic(`
       <Stack state={{ files: [{ checked: true }, { checked: false }, { checked: true }] }}>
-        <Checkbox for:each="files as f, i" bind:state="files[i].checked" label={expr("f.path")} />
+        {files.map((f, i) => <Checkbox checked={files[i].checked} label={f.path} />)}
       </Stack>`);
     expect(validate(doc, DEFAULT_MANIFEST).ok).toBe(true);
     const resolved = resolve(doc, DEFAULT_MANIFEST);
@@ -337,32 +357,38 @@ describe('validate / resolve / walk', () => {
     expect(doc.root.children?.[0]?.directives?.['bind:state']).toBe('files[i].checked');
   });
 
-  it('from:state follows record paths', () => {
-    const doc = loadMosaic(`
-      <Stack state={{ data: { view: "grid" } }}>
-        <Input label="View" from:state="data.view" />
-      </Stack>`);
+  it('from:state follows record paths (IR-level; no authoring surface)', () => {
+    const doc: MosaicDocument = {
+      mosaic_version: MOSAIC_VERSION,
+      id: 'from-state',
+      root: {
+        type: 'Stack',
+        props: { state: { data: { view: 'grid' } } },
+        children: [
+          { type: 'Input', props: { label: 'View' }, directives: { 'from:state': 'data.view' } },
+        ],
+      },
+    };
     const resolved = resolve(doc, DEFAULT_MANIFEST);
     expect(resolved.root.children?.[0]?.props?.value).toBe('grid');
   });
 
   it('flags bind:state / from:state strings that are not paths', () => {
-    for (const src of [
-      '<Slider label="x" bind:state="files.map(f)" min={0} max={1} />',
-      '<Input label="x" from:state="1 + count" />',
-    ]) {
-      const result = validate(loadMosaic(src), DEFAULT_MANIFEST);
-      expect(result.ok, src).toBe(false);
+    for (const directives of [{ 'bind:state': 'files.map(f)' }, { 'from:state': '1 + count' }]) {
+      const doc: MosaicDocument = {
+        mosaic_version: MOSAIC_VERSION,
+        id: 'bad-path',
+        root: { type: 'Input', props: { label: 'x' }, directives },
+      };
+      const result = validate(doc, DEFAULT_MANIFEST);
+      expect(result.ok, JSON.stringify(directives)).toBe(false);
       if (result.ok) continue;
-      expect(
-        result.errors.some((e) => e.code === 'INVALID_STATE_PATH'),
-        src,
-      ).toBe(true);
+      expect(result.errors.some((e) => e.code === 'INVALID_STATE_PATH')).toBe(true);
     }
   });
 
   it('a non-interactive host renders default states', () => {
-    const doc = loadMosaic('<Stack state={{ on: false }}><Text if:show="on">secret</Text></Stack>');
+    const doc = loadMosaic('<Stack state={{ on: false }}>{on && <Text>secret</Text>}</Stack>');
     const still = resolve(doc, { ...DEFAULT_MANIFEST, interactive: false });
     expect(still.root.children).toHaveLength(1); // if:show ignored, default state kept
   });
@@ -385,7 +411,7 @@ describe('validate / resolve / walk', () => {
     expect(out).toContain('May 3 - Incident opened - Elevated 5xx from the queue');
     expect(out).toContain('May 4 - Resolved');
     expect(out).not.toContain('warn');
-    expect(out).not.toContain('\u2014'); // the em dash is gone from the floor
+    expect(out).not.toContain('—'); // the em dash is gone from the floor
   });
 
   it('rich components decompose where unsupported (invariant 8)', () => {
@@ -467,23 +493,23 @@ describe('the Diagram block', () => {
       ]}
       groups={[{ id: "before", label: "Before" }, { id: "after", label: "After" }]}
       edges={[{ from: "before", to: "after", label: "extract" }, { from: "client", to: "monolith" }]}`);
-    const stack = blockSpec('Diagram')?.decomposeTo?.(doc.root);
+    const stack = DEFAULT_REGISTRY.get('Diagram')?.decompose?.(doc.root);
     expect(stack?.type).toBe('Stack');
     const lines = (stack?.children ?? []).map((child) => ({
-      bold: child.props?.weight === 'bold',
+      heading: child.props?.variant === 'label',
       text: child.children?.[0]?.props?.value,
     }));
     expect(lines).toEqual([
-      { bold: true, text: 'From monolith to services' },
-      { bold: true, text: 'Before' },
-      { bold: false, text: '- Monolith (service)' },
-      { bold: true, text: 'After' },
-      { bold: false, text: '- API (service)' },
-      { bold: false, text: '- Worker (service)' },
-      { bold: true, text: 'Nodes' },
-      { bold: false, text: '- Client (client)' },
-      { bold: false, text: 'Before -> After - extract' },
-      { bold: false, text: 'Client -> Monolith' },
+      { heading: true, text: 'From monolith to services' },
+      { heading: true, text: 'Before' },
+      { heading: false, text: '- Monolith (service)' },
+      { heading: true, text: 'After' },
+      { heading: false, text: '- API (service)' },
+      { heading: false, text: '- Worker (service)' },
+      { heading: true, text: 'Nodes' },
+      { heading: false, text: '- Client (client)' },
+      { heading: false, text: 'Before -> After - extract' },
+      { heading: false, text: 'Client -> Monolith' },
     ]);
   });
 });

@@ -30,5 +30,5 @@ Every artifact in [`examples/`](../examples) parses, validates, renders interact
 
 ## Cross-package consistency
 
-Every package uses the same `tsconfig.base.json`, builds with `tsup` (`pnpm run build`), tests with `vitest` (`pnpm run test`), lints and formats with Biome (`pnpm run check`), and publishes as `@mosaic/<name>`.
+Every package uses the same `tsconfig.base.json`, builds with `tsup` (`pnpm run build`), tests with `vitest` (`pnpm run test`), lints and formats with Biome (`pnpm run check`), and publishes as `@mosaicjs/<name>`.
 The lint/format invocations are wired into `lefthook.yml` at the repo root.

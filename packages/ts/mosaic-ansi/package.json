@@ -1,7 +1,7 @@
 {
-  "name": "@mosaic/ansi",
-  "version": "0.0.0",
-  "description": "The text/degraded renderer for Mosaic (the decomposeTo floor). No React; walks the AST and emits plain text / ANSI.",
+  "name": "@mosaicjs/ansi",
+  "version": "0.8.0",
+  "description": "The text/degraded renderer for Mosaic (the decompose floor). No React; walks the IR and prints.",
   "license": "MIT",
   "author": "Tamim Bin Hakim <tamimbinhakim.work@gmail.com>",
   "type": "module",
@@ -15,7 +15,7 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": ["LICENSE", "dist", "README.md"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -23,7 +23,7 @@
     "clean": "rm -rf dist .tsbuildinfo"
   },
   "dependencies": {
-    "@mosaic/core": "workspace:*"
+    "@mosaicjs/core": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

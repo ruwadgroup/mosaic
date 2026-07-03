@@ -1,26 +1,74 @@
 // @vitest-environment jsdom
 //
-// The reactive loop, end to end in a real DOM: a control writes state, derived
-// values recompute, a conditional flips, and a button hands the host a
-// computed intent.
+// The reactive loop in a real DOM: a control writes state, derived values
+// recompute, a conditional flips, and a button hands the host a computed
+// intent. Also exercises advisory diagnostics, the error boundary, and a
+// custom bound control.
 
-import { DEFAULT_MANIFEST } from '@mosaic/core';
-import { act } from 'react';
+import { createRegistry, defaultBlocks, defineBlockSchema, parse } from '@mosaicjs/core';
+import { type ComponentType, act, createElement, useState } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { render } from '../src/index.js';
+import {
+  Mosaic,
+  type MosaicBlockProps,
+  type MosaicProps,
+  defineBlock,
+  defineComponents,
+} from '../src/index.js';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+// A minimal host component set: unstyled elements that wire the runtime's
+// value/setValue/events contract the way any real host would.
+const host = defineComponents({
+  Card: ({ children }) => createElement('section', null, ...children),
+  Stack: ({ children }) => createElement('div', null, ...children),
+  Text: ({ children }) => createElement('p', null, ...children),
+  Button: ({ children, events }) =>
+    createElement('button', { type: 'button', onClick: events.click }, ...children),
+  Slider: ({ props, value, setValue }) =>
+    createElement('input', {
+      type: 'range',
+      'aria-label': props.label,
+      min: props.min,
+      max: props.max,
+      step: props.step,
+      value: Number(value ?? 0),
+      onChange: (e: { target: HTMLInputElement }) => setValue?.(Number(e.target.value)),
+    }),
+  Tabs: function HostTabs({ props, children }) {
+    const labels = props.items ?? [];
+    const [active, setActive] = useState(props.active ?? labels[0] ?? '');
+    const index = Math.max(labels.indexOf(String(active)), 0);
+    return createElement(
+      'div',
+      null,
+      createElement(
+        'div',
+        { role: 'tablist' },
+        ...labels.map((label) =>
+          createElement(
+            'button',
+            { key: label, type: 'button', role: 'tab', onClick: () => setActive(label) },
+            label,
+          ),
+        ),
+      ),
+      children[index] ?? null,
+    );
+  },
+});
+
 const EGG_SLIDER = `
-<Card gap="3" state={{ eggs: 80 }}>
-  <Slider label="Number of eggs" bind:state="eggs" min={0} max={144} step={1} />
-  <Text size="xl">Total: {expr("formatCurrency(eggs * 0.50)")}</Text>
-  <Text if:show="eggs > 60" tone="warn">Bulk order</Text>
-  <Button on:event={{ click: { action: "order", args: { eggs: expr("eggs"), total: expr("eggs * 0.50") } } }}>
+<Card state={{ eggs: 80 }}>
+  <Slider label="Number of eggs" value={eggs} min={0} max={144} step={1} />
+  <Text>Total: {formatCurrency(eggs * 0.50)}</Text>
+  {eggs > 60 && <Text tone="warn">Bulk order</Text>}
+  <Button variant="primary" onClick={order({ eggs: eggs, total: eggs * 0.50 })}>
     Place order
   </Button>
 </Card>`;
@@ -35,6 +83,12 @@ describe('the reactive loop in a DOM', () => {
   let container: HTMLDivElement;
   let root: Root;
 
+  const mount = async (props: MosaicProps) => {
+    await act(async () => {
+      root.render(createElement(Mosaic, props));
+    });
+  };
+
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -46,19 +100,18 @@ describe('the reactive loop in a DOM', () => {
     container.remove();
   });
 
-  it('slider drives the derived total and the conditional, locally', async () => {
-    const intents: Array<{ action: string; args?: unknown }> = [];
-    await act(async () => {
-      root.render(
-        render(EGG_SLIDER, { onAction: (action, args) => void intents.push({ action, args }) }),
-      );
+  it('slider drives the derived total and the conditional, and the button hands over a computed intent', async () => {
+    const intents: Array<{ name: string; args?: unknown }> = [];
+    await mount({
+      source: EGG_SLIDER,
+      components: host,
+      onIntent: (name, args) => void intents.push({ name, args }),
     });
     expect(container.textContent).toContain('$40.00');
     expect(container.textContent).toContain('Bulk order');
 
     const slider = container.querySelector('input[type="range"]') as HTMLInputElement;
     await act(async () => setRangeValue(slider, '10'));
-
     expect(container.textContent).toContain('$5.00');
     expect(container.textContent).not.toContain('Bulk order');
 
@@ -68,289 +121,127 @@ describe('the reactive loop in a DOM', () => {
     await act(async () => {
       button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-
-    expect(intents).toEqual([{ action: 'order', args: { eggs: 10, total: 5 } }]);
+    expect(intents).toEqual([{ name: 'order', args: { eggs: 10, total: 5 } }]);
   });
 
-  it('segmented control swaps if:show subtrees with no round-trip', async () => {
-    await act(async () => {
-      root.render(
-        render(`
-          <Stack gap="2" state={{ audience: "SaaS" }}>
-            <SegmentedControl bind:state="audience" options={["SaaS", "Bank"]} />
-            <Text if:show="audience == 'SaaS'">saas-verdict</Text>
-            <Text if:show="audience == 'Bank'">bank-verdict</Text>
-          </Stack>`),
-      );
+  it('state.toggle mutates locally without reaching the host', async () => {
+    const intents: string[] = [];
+    await mount({
+      source: `
+        <Stack state={{ open: false }}>
+          <Button onClick={toggle(open)}>More</Button>
+          {open && <Text>details</Text>}
+        </Stack>`,
+      components: host,
+      onIntent: (name) => void intents.push(name),
     });
-    expect(container.textContent).toContain('saas-verdict');
-    expect(container.textContent).not.toContain('bank-verdict');
-
-    const bank = [...container.querySelectorAll('button')].find(
-      (b) => b.textContent === 'Bank',
-    ) as HTMLButtonElement;
-    await act(async () => {
-      bank.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain('bank-verdict');
-    expect(container.textContent).not.toContain('saas-verdict');
+    expect(container.textContent).not.toContain('details');
+    const button = container.querySelector('button') as HTMLButtonElement;
+    await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.textContent).toContain('details');
+    expect(intents).toEqual([]);
   });
 
   it('Tabs opens on the default tab and switches on click', async () => {
-    await act(async () => {
-      root.render(
-        render(`
-          <Tabs active="Two" items={["One", "Two"]}>
-            <Text>panel-one</Text>
-            <Text>panel-two</Text>
-          </Tabs>`),
-      );
+    await mount({
+      source: `
+        <Tabs active="Two" items={["One", "Two"]}>
+          <Text>panel-one</Text>
+          <Text>panel-two</Text>
+        </Tabs>`,
+      components: host,
     });
     expect(container.textContent).toContain('panel-two');
     expect(container.textContent).not.toContain('panel-one');
-
     const one = [...container.querySelectorAll('[role="tab"]')].find(
       (b) => b.textContent === 'One',
     ) as HTMLButtonElement;
-    await act(async () => {
-      one.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
+    await act(async () => one.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(container.textContent).toContain('panel-one');
     expect(container.textContent).not.toContain('panel-two');
   });
 
-  it('MultiSelect toggles an array in state', async () => {
-    await act(async () => {
-      root.render(
-        render(`
-          <Stack state={{ channels: ["email"] }}>
-            <MultiSelect label="Notify" bind:state="channels" options={["email", "push", "SMS"]} />
-            <Text>{expr("concat('picked:', join(channels, '+'))")}</Text>
-          </Stack>`),
-      );
+  it('reports removed props through onDiagnostics, once, without blanking', async () => {
+    const batches: Array<Array<{ code: string; prop?: string }>> = [];
+    await mount({
+      source: '<Stack gap="3"><Text>kept</Text></Stack>',
+      components: host,
+      onDiagnostics: (d) => void batches.push(d),
     });
-    expect(container.textContent).toContain('picked:email');
-
-    const push = [...container.querySelectorAll('[role="option"]')].find((b) =>
-      b.textContent?.includes('push'),
-    ) as HTMLButtonElement;
-    await act(async () => {
-      push.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(container.textContent).toContain('picked:email+push');
+    expect(container.textContent).toContain('kept');
+    expect(batches).toHaveLength(1);
+    expect(batches[0]?.some((d) => d.code === 'REMOVED_PROP' && d.prop === 'gap')).toBe(true);
   });
 
-  it('Autocomplete filters locally and commits the pick to state', async () => {
-    await act(async () => {
-      root.render(
-        render(`
-          <Stack state={{ timezone: "" }}>
-            <Autocomplete label="Timezone" bind:state="timezone"
-              options={["Europe/Berlin", "Europe/London", "Asia/Dhaka"]} />
-            <Text if:show="timezone == 'Asia/Dhaka'">tz-committed</Text>
-          </Stack>`),
-      );
+  it('degrades a throwing component to its children', async () => {
+    const Boom = (() => {
+      throw new Error('boom');
+    }) as ComponentType<MosaicBlockProps>;
+    await mount({
+      source: '<Stack><Text>safe</Text></Stack>',
+      components: defineComponents({
+        Stack: Boom,
+        Text: ({ children }: MosaicBlockProps) => createElement('p', null, ...children),
+      }),
     });
-    const input = container.querySelector('[role="combobox"]') as HTMLInputElement;
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-      setter?.call(input, 'dha');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-
-    const options = [...container.querySelectorAll('[role="option"]')].map((o) => o.textContent);
-    expect(options).toEqual(['Asia/Dhaka']);
-
-    await act(async () => {
-      (container.querySelector('[role="option"]') as HTMLButtonElement).dispatchEvent(
-        new MouseEvent('click', { bubbles: true }),
-      );
-    });
-    expect(container.textContent).toContain('tz-committed');
+    expect(container.textContent).toContain('safe');
   });
 
-  it('state.toggle handles local mutations without reaching the host', async () => {
-    const intents: string[] = [];
-    await act(async () => {
-      root.render(
-        render(
-          `
-          <Stack state={{ open: false }}>
-            <Button on:event={{ click: "state.toggle('open')" }}>More</Button>
-            <Text if:show="open">details</Text>
-          </Stack>`,
-          { onAction: (action) => void intents.push(action) },
-        ),
-      );
+  it('computed set() makes a working counter and digit pad', async () => {
+    await mount({
+      source: `
+        <Stack state={{ count: 0, display: "" }}>
+          <Button onClick={set(count, count + 1)}>+1</Button>
+          <Button onClick={() => set(display, display + "7")}>7</Button>
+          <Text>count:{count}</Text>
+          <Text>display:[{display}]</Text>
+        </Stack>`,
+      components: host,
     });
-    expect(container.textContent).not.toContain('details');
-
-    const button = container.querySelector('button') as HTMLButtonElement;
-    await act(async () => {
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain('details');
-    expect(intents).toEqual([]); // local mutation never left the artifact
+    const click = async (label: string) => {
+      const b = [...container.querySelectorAll('button')].find(
+        (el) => el.textContent === label,
+      ) as HTMLButtonElement;
+      await act(async () => b.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    };
+    await click('+1');
+    await click('+1');
+    expect(container.textContent).toContain('count:2');
+    await click('7');
+    await click('7');
+    expect(container.textContent).toContain('display:[77]');
   });
 
-  it('for:each index binding drives per-row record state and re-derives labels', async () => {
-    await act(async () => {
-      root.render(
-        render(`
-          <Card gap="2" state={{ files: [
-            { path: "src/atoms.ts", checked: true },
-            { path: "src/effect.ts", checked: true },
-            { path: "src/store.ts", checked: false }
-          ] }}>
-            <Stack for:each="files as f, i">
-              <Checkbox bind:state="files[i].checked" label={expr("f.path")} />
-            </Stack>
-            <Text>{expr("concat('Commit ', sum(map(files, f, f.checked ? 1 : 0)), ' files')")}</Text>
-          </Card>`),
-      );
+  it('two-way binds a custom control via bind:state', async () => {
+    const KnobSchema = defineBlockSchema({
+      name: 'Knob',
+      kind: 'control',
+      doc: 'A test knob.',
+      props: { label: { type: 'string', doc: 'Label.' } },
+      example: '<Knob label="x" />',
     });
-    expect(container.textContent).toContain('Commit 2 files');
-
-    const boxes = [...container.querySelectorAll('input[type="checkbox"]')] as HTMLInputElement[];
-    expect(boxes).toHaveLength(3);
-    expect(boxes.map((b) => b.checked)).toEqual([true, true, false]);
-
-    await act(async () => {
-      (boxes[0] as HTMLInputElement).click();
+    const Knob = defineBlock(KnobSchema, ({ value, setValue }) =>
+      createElement(
+        'button',
+        { type: 'button', onClick: () => setValue?.('b') },
+        String(value ?? ''),
+      ),
+    );
+    const registry = createRegistry([...defaultBlocks, KnobSchema]);
+    // parse binds value={path} for built-ins only, so a custom control carries
+    // an explicit bind:state directive; the runtime supplies value/setValue.
+    const parsed = parse('<Stack state={{ k: "a" }}><Knob /><Text>picked:{k}</Text></Stack>');
+    if (!parsed.ok) throw new Error('fixture did not parse');
+    const knobNode = parsed.doc.root.children?.[0];
+    if (knobNode) knobNode.directives = { 'bind:state': 'k' };
+    await mount({
+      source: parsed.doc,
+      components: { ...host, ...Knob.component },
+      registry,
     });
-    expect(container.textContent).toContain('Commit 1 files');
-
-    await act(async () => {
-      const fresh = [...container.querySelectorAll('input[type="checkbox"]')];
-      (fresh[2] as HTMLInputElement).click();
-    });
-    expect(container.textContent).toContain('Commit 2 files');
-  });
-
-  it("state.set accepts a path ('data.view')", async () => {
-    await act(async () => {
-      root.render(
-        render(`
-          <Stack state={{ data: { view: "list" } }}>
-            <Button on:event={{ click: "state.set('data.view', 'grid')" }}>Grid</Button>
-            <Text if:show="data.view == 'grid'">grid-active</Text>
-          </Stack>`),
-      );
-    });
-    expect(container.textContent).not.toContain('grid-active');
-
-    const button = container.querySelector('button') as HTMLButtonElement;
-    await act(async () => {
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(container.textContent).toContain('grid-active');
-  });
-});
-
-const DIAGRAM_MANIFEST = {
-  ...DEFAULT_MANIFEST,
-  components_supported: [...DEFAULT_MANIFEST.components_supported, 'Diagram'],
-};
-
-const REQUEST_PATH = `
-<Stack gap="3" state={{ selected: null }}>
-  <Diagram alt="request path" bind:state="selected"
-    on:event={{ select: { action: "openNode", args: { origin: "diagram" } } }}
-    nodes={[
-      { id: "edge", label: "Edge" },
-      { id: "auth", label: "Auth", group: "services" },
-      { id: "api", label: "API", group: "services" }
-    ]}
-    edges={[{ from: "edge", to: "auth" }, { from: "edge", to: "api" }]}
-    groups={[{ id: "services", label: "Services" }]} />
-  <Card if:show="selected == 'edge'"><Text>edge-panel</Text></Card>
-  <Card if:show="selected == 'auth'"><Text>auth-panel</Text></Card>
-</Stack>`;
-
-describe('the Diagram block in a DOM', () => {
-  let container: HTMLDivElement;
-  let root: Root;
-
-  beforeEach(() => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  });
-
-  afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
-  });
-
-  it('node click writes the bound selection and swaps the detail panel', async () => {
-    await act(async () => {
-      root.render(render(REQUEST_PATH, { manifest: DIAGRAM_MANIFEST }));
-    });
-    expect(container.querySelector('svg[role="img"]')).not.toBeNull();
-    expect(container.textContent).not.toContain('edge-panel');
-    expect(container.textContent).not.toContain('auth-panel');
-
-    const auth = container.querySelector('[data-node-id="auth"]') as SVGGElement;
-    await act(async () => {
-      auth.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(container.textContent).toContain('auth-panel');
-    expect(container.textContent).not.toContain('edge-panel');
-    // the selection ring moved to the clicked node
-    const ring = container.querySelector('[data-node-id="auth"] rect') as SVGRectElement;
-    expect(ring.getAttribute('stroke-width')).toBe('2');
-
-    const edge = container.querySelector('[data-node-id="edge"]') as SVGGElement;
-    await act(async () => {
-      edge.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(container.textContent).toContain('edge-panel');
-    expect(container.textContent).not.toContain('auth-panel');
-
-    const bg = container.querySelector('[data-diagram-bg]') as SVGRectElement;
-    await act(async () => {
-      bg.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(container.textContent).not.toContain('edge-panel');
-    expect(container.textContent).not.toContain('auth-panel');
-  });
-
-  it('an authored select intent reaches the host with the clicked id merged in', async () => {
-    const intents: Array<{ action: string; args?: unknown }> = [];
-    await act(async () => {
-      root.render(
-        render(REQUEST_PATH, {
-          manifest: DIAGRAM_MANIFEST,
-          onAction: (action, args) => void intents.push({ action, args }),
-        }),
-      );
-    });
-
-    const api = container.querySelector('[data-node-id="api"]') as SVGGElement;
-    await act(async () => {
-      api.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(intents).toEqual([{ action: 'openNode', args: { origin: 'diagram', id: 'api' } }]);
-    expect(container.textContent).not.toContain('edge-panel'); // selection stayed local
-  });
-
-  it('renders statically when the manifest is non-interactive', async () => {
-    const intents: string[] = [];
-    await act(async () => {
-      root.render(
-        render(REQUEST_PATH, {
-          manifest: { ...DIAGRAM_MANIFEST, interactive: false },
-          onAction: (action) => void intents.push(action),
-        }),
-      );
-    });
-    const auth = container.querySelector('[data-node-id="auth"]') as SVGGElement;
-    expect(auth.getAttribute('style')).toBeNull(); // no pointer cursor
-    await act(async () => {
-      auth.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(intents).toEqual([]); // no handler fired: the diagram is static
+    expect(container.textContent).toContain('picked:a');
+    const knob = container.querySelector('button') as HTMLButtonElement;
+    await act(async () => knob.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.textContent).toContain('picked:b');
   });
 });

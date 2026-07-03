@@ -1,106 +1,88 @@
 ---
 name: mosaic
-description: Emit a Mosaic artifact - an interface composed from general blocks - instead of prose. Use when a reply is spatial (a plan, comparison, dashboard, estimator, mock screen, diagram, or trace), when the user asks for an interface or something interactive, or when a tool result should render as UI.
+description: Render the reply as a Mosaic artifact - a live, interactive interface the host app draws natively in its own design - instead of prose. Use when the answer is spatial or interactive: visualizing an architecture or flow, mocking a screen, comparing options, laying out a plan, charting data, or building an estimator or dashboard - or when the user says mosaic or asks to see an interface.
 ---
 
 # Emitting Mosaic
 
-> **Host note.** This skill is a template.
-> Before attaching it, edit the [Blocks](#blocks-host-editable) section to mirror your manifest, and swap the example for one in your house idiom.
-> Everything else is the format and holds for every host.
+You write standard JSX from a fixed block vocabulary; the host draws every block with its own components, and interaction runs locally (a slider drives a total with no round-trip to you).
+The JSX is **data, never code**: expressions run in a bounded, pure interpreter, and events become named **intents** the host brokers.
 
-Mosaic turns your thinking into an interface the host renders in its own look.
-You write **mosaic-jsx** - a strict JSX pattern that is data, never code.
-There is nothing to execute: computation is `expr("…")`, actions are named intents, and the host draws every block.
-
-## When to emit an artifact
-
-Emit one when the reply is **spatial** - a plan, a comparison, a dashboard, a calculator, a mock screen, an architecture flow, a trace.
 If prose reads just as well linearly, write prose.
-One artifact per reply; put surrounding commentary outside the fence.
-
-## The rules
-
-These are inviolable; the host's compiler rejects violations.
-
-1. **Data, never code.** Braces admit only JSON literals plus two calls: `token("…")` and `expr("…")`.
-   Never `{eggs * 2}` (write `expr("eggs * 2")`), never `.map(...)` (use `for:each`), never arrow functions, template literals, or spread of identifiers.
-2. **Blocks are PascalCase.** No HTML tags, no `class`, no `className`, no `style`.
-3. **Tokens, not values.** `tone="warn"`, `gap="3"`, `token("color.accent")` - never a hex color, a pixel count, or a font name.
-4. **Data is baked in.** Everything the artifact shows or computes over is in its props and `state={{…}}` at emit time.
-   Nothing fetches, subscribes, or refreshes later.
-5. **Every visual block carries `alt`** - `Image`, `Video`, `Chart`, `VegaChart`, `Diagram`, `Canvas`.
-6. **Fence it.** Wrap the artifact in ` ```mosaic v=1 id=kebab-id ` … ` ``` `.
-   Reuse the same `id` when regenerating the same artifact, so the host replaces instead of appending.
+One artifact per reply, commentary outside the fence.
+Fence it as ` ```mosaic v=1 id=kebab-id ` and reuse the same `id` when regenerating so the host replaces the artifact in place.
 
 ## Compose
 
 1. **Bake the state.**
-   Declare every value interaction will touch in the root's `state={{…}}` - it is the schema; writes never invent structure.
-   Done when: no directive or expression references a name missing from `state` or from a `for:each` binding.
+   Declare every value interaction touches in the root's `state={{…}}` (a literal object).
+   Everything the artifact shows lives in its props at emit time; nothing fetches or refreshes later - never a spinner.
+   Done when no expression reads a name missing from `state` or a `.map` binding.
 2. **Lay out from blocks.**
-   Nest `Stack` / `Grid` / `Card` for structure; pick content and data blocks from [Blocks](#blocks-host-editable).
-   Compose - there is no `<Plan>` tag; a plan is `Steps` + `Timeline` + a `DataTable`.
-   Done when: every tag is in the block list and every repeated shape is one `for:each`, not copy-paste.
-3. **Wire local interaction.**
-   `bind:state` on controls (paths work: `files[i].checked`), `expr("…")` for derived values, `if:show` for conditionals, `for:each` for lists.
-   Local means local: a slider driving a total needs no host round-trip.
-   Done when: everything that can compute client-side does.
-4. **Cross to the host only through intents.**
-   `on:event={{ click: { action: "name", args: { total: expr("…") } } }}` - the args carry computed values.
-   Local mutations use `state.set('path', literal)` / `state.toggle('path')`.
-   Done when: no action pretends to fetch, navigate, or run anything itself.
-5. **Self-check, then emit.**
-   Done when every check passes; fix and re-check before emitting:
-   - Each of [the rules](#the-rules) holds - walk the six against your tags, braces, tokens, `alt`, and fence.
-   - Every name an expression or bind reads exists in `state` or a loop binding.
-   - `Diagram` ids are unique and every edge endpoint is defined.
+   Nest `Stack` / `Grid` / `Card`; pick from the vocabulary below.
+   There is no `<Plan>` tag - a plan is `Steps` + `Timeline` + a `DataTable`.
+   Done when every tag is in the block list and every repeated shape is one `.map`, not copy-paste.
+3. **Wire the interaction.**
+   `value={path}` / `checked={path}` two-way binds a control (a computed expression there is read-only).
+   `{cond && <El/>}` and ternaries render conditionally; `{list.map((item) => <El key={…}/>)}` repeats.
+   `onClick={saveDraft({ total: seats * 16 })}` hands the host an intent with computed args; `onClick={toggle(open)}` / `onClick={set(count, count + 1)}` mutate locally - `set` takes any expression, evaluated against current state at click time, so counters and calculators work.
+   Done when everything computable computes locally and every event is an intent or a local mutation.
+4. **Check the boundaries, then emit.**
+   Done when every boundary below holds.
 
-## Directives
+## Boundaries
 
-| Directive    | Value                                  | Use                                            |
-| ------------ | -------------------------------------- | ---------------------------------------------- |
-| `bind:state` | state path                             | two-way bind a control                         |
-| `from:state` | state path                             | read-only value                                |
-| `from:expr`  | expression                             | derived value                                  |
-| `if:show`    | boolean expression                     | conditional render                             |
-| `for:each`   | `"EXPR as item"` / `"EXPR as item, i"` | repeat a subtree; `i` enables `items[i].field` |
-| `on:event`   | `{ event: action }`                    | `state.set` / `state.toggle`, or a host intent |
-| `key`        | string or `expr("…")`                  | stable identity for reorderable items          |
+Each of these is a compile error:
 
-## expr
+- **Blocks only.** No HTML tags. The host owns the design: no `className`, no `style`, no raw colors - speak in semantic tokens (`tone="warn"`).
+- **Bounded expressions.** Arithmetic, comparisons, `&& || !`, ternary, template literals, and array methods (`.map .filter .reduce .sort .slice .join .includes .length`) work; the function catalog is `abs min max round floor ceil clamp · len lower upper trim concat substr replace split join contains · formatCurrency formatNumber toFixed · map filter reduce sum count any all sort sortBy slice · has coalesce`. No assignments, no `new`, no regex, no other functions. Unknown names evaluate to null.
+- **`alt` required** on `Chart` and `Diagram`.
+- **Host chrome stays the host's.** Modals, toasts, and navigation are requested through an intent, never drawn.
 
-Bounded and pure: arithmetic, comparison, `&& || !`, ternary, `in`, indexing, list literals.
-Functions - math: `abs min max round floor ceil clamp` · string: `len lower upper trim concat substr replace split join contains` · format: `formatCurrency formatNumber toFixed` · arrays: `map filter reduce sum count any all sort sortBy slice` (folds bind an item: `filter(rows, r, r.open)`) · misc: `has coalesce`.
-No assignment, no user functions, no method calls (`items.map(…)` is invalid; `map(items, …)` is not).
-Missing names evaluate to `null`, and the empty array is falsy.
-
-## Blocks (host-editable)
+## Blocks
 
 **Layout.** `Box` `Stack` `Grid` `Divider` `Card`
-**Content.** `Text` `Heading` `Markdown` `Image` `Icon` `Link` `Badge` `Tag` `Avatar` `Code` `Callout`
+**Content.** `Text` `Heading` `Markdown` `Image` `Icon` `Link` `Badge` `Tag` `Avatar` `AvatarGroup` `Code` `Callout`
 **Controls.** `Button` `Input` `Select` `MultiSelect` `Autocomplete` `Checkbox` `Radio` `Toggle` `Slider` `DatePicker` `ColorPicker` `FilePicker` `Rating` `TagInput` `Field` `Disclosure` `Accordion`
 **Structure.** `Tabs` `Steps` `SegmentedControl` `Progress` `Empty`
-**Data & viz.** `DataTable` `List` `Tree` `Board` `Timeline` `Calendar` `Stat` `Chart` `VegaChart` `Diagram` `Canvas`
+**Media.** `Video` `Audio` `Carousel`
+**Data & viz.** `DataTable` `List` `Tree` `Board` `Timeline` `Calendar` `Stat` `Chart` `VegaChart` `Diagram` `Canvas` `Embed`
 
-Modals, toasts, menus, and navigation are the host's chrome - request them with an intent.
-Never a spinner: your data is already baked in.
+Structure, not style.
+The format carries meaning and structure; the host owns spacing, typography, density, and chrome.
+Express structure - sections, rows, groupings - and let the host render it dense.
+There is no gap, padding, size, or weight to set: say what a thing *is*, not how big or how far apart.
+
+- `Stack` - `direction="horizontal"` for rows; `justify="between"` puts text left and actions right on one row; `align` sets the cross axis.
+- `Card` - `tone` tints it into an inset status panel (a green "handled" section).
+- `Text` - `variant="label"` is a section micro-label; `variant="caption"` is secondary supporting text. Inline emphasis (bold, italic) belongs to `Markdown`.
+- `Button` - `variant` is an intent hierarchy: `primary` (one per view), `secondary`, `subtle` (inline row actions), `danger` (destructive).
+- **Icons are Lucide** (lucide.dev), kebab-case names: `<Icon name="wallet" />`, or a leading icon on a block - `<Badge icon="circle-check">…</Badge>`, `<Button icon="send">…</Button>`, `<Callout icon="sunrise">…</Callout>`. Use real Lucide names (`circle-check`, `triangle-alert`, `arrow-up-right`); an unknown name renders nothing.
+
+Exact shapes for the data blocks:
+
+- `DataTable` - `columns={["A","B"]}` and `rows={[["1","2"],["3","4"]]}` (positional string arrays, never objects).
+- `Chart` - `type` (`bar line area donut radar gauge scatter`), `data={[{ label, value }]}`, `alt`.
+- `Timeline` - `items={[{ date, title, description?, tone? }]}`.
+- `Stat` - `label` + `value`; `tone` for the verdict color.
+- `Tabs` - `items={["Overview","Docs"]}` + one child panel per item.
+- Tones: `ok warn bad primary subtle`.
 
 ## Example
 
 ```mosaic v=1 id=seat-estimator
-<Card gap="3" state={{ seats: 12, annual: true }}>
-  <Field label={expr("concat('Seats: ', seats)")}>
-    <Slider bind:state="seats" min={1} max={200} />
+<Card state={{ seats: 12, annual: true }}>
+  <Field label={`Seats: ${seats}`}>
+    <Slider value={seats} min={1} max={200} />
   </Field>
-  <Toggle bind:state="annual" label="Bill annually (save 20%)" />
-  <Stat label={expr("annual ? 'Billed today (12 mo)' : 'Billed monthly'")}
-        value={expr("formatCurrency(seats * 16 * (annual ? 12 * 0.8 : 1))")} />
-  <Callout if:show="seats >= 100" tone="warn">Above 100 seats, Enterprise usually wins.</Callout>
-  <Button tone="primary" on:event={{ click: { action: "startCheckout", args: {
-    seats: expr("seats"), total: expr("seats * 16 * (annual ? 12 * 0.8 : 1)")
-  } } }}>Continue to checkout</Button>
+  <Toggle checked={annual} label="Bill annually (save 20%)" />
+  <Stat label={annual ? "Billed today (12 mo)" : "Billed monthly"}
+        value={formatCurrency(seats * 16 * (annual ? 12 * 0.8 : 1))} />
+  {seats >= 100 && <Callout tone="warn">Above 100 seats, Enterprise usually wins.</Callout>}
+  <Button variant="primary" onClick={startCheckout({ seats: seats, total: seats * 16 * (annual ? 12 * 0.8 : 1) })}>
+    Continue to checkout
+  </Button>
 </Card>
 ```
 
-For per-row selection, detail-on-click diagrams, live-filtered lists, and the leak-fix table, read [REFERENCE.md](REFERENCE.md).
+For interaction patterns (per-row selection, detail-on-click diagrams, live filters) and Chart/Diagram sizing, read [REFERENCE.md](REFERENCE.md) before composing anything beyond a simple card.

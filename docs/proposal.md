@@ -19,10 +19,22 @@ anything, inside your app's look, with no code to run._
 
 ---
 
+> **0.7 amendment (breaking).**
+> This proposal is not re-cut; the numbering stands.
+> Format 0.7 sharpens the semantic line: presentational props (`gap`, `pad`, `Text size`/`weight`/`caps`, `Icon size`, `Button size`, `Stack wrap`, `Tabs variant`) and `token(...)` refs are removed - the host owns spacing, typography, density, and chrome.
+> `Text` gains `variant="body|label|caption"` and `Button` gains `variant="primary|secondary|subtle|danger"` (inline emphasis moves to Markdown).
+> The block vocabulary is modular: every block is a `BlockDefinition`, hosts compose a registry with `createRegistry`, and custom blocks come from `defineBlockSchema` (with an optional `expandsTo` macro template).
+> Delivery is multi-provider: the new `@mosaicjs/ai` carries neutral tool descriptors plus `/vercel`, `/mcp`, and `/prompt` adapters, and `@mosaicjs/react` is fully headless (`onIntent` replaces `onAction`; the host's components draw every block).
+> The delivery model is also simplified: the artifact travels as a ` ```mosaic ` fence in the model's reply, MCP carries only the three introspection tools (`mosaic_ls`, `mosaic_cat`, `mosaic_validate`), and the `ui://` resource and MCP-Apps HTML bridge of §7.1 are retired.
+> 0.8 extends local mutations: `set(path, value)` accepts any bounded expression, evaluated against current state at event time (counters and calculators work), and local mutations are canonical action records (`{ action: "state.set", args: { path, value } }`) in the IR - the string forms are gone.
+> The sections below read against the current vocabulary except where a removed prop appears in an illustrative snippet.
+
+---
+
 ## 0. One-paragraph summary
 
 Mosaic is a format for the interfaces an AI agent produces, meant for the **builders of AI apps**
-(Claude Code, t3-code, Codex, Cursor, and the like).
+(Claude Code, Codex, Cursor, and the like).
 The agent writes **Mosaic**, a JSX pattern that compiles to a canonical **IR** composed from a set
 of **general building blocks** - layout, content, controls, and data/viz.
 Because the blocks are general, an agent composes whatever interface it needs.
@@ -33,8 +45,9 @@ Every component is rendered by the host's own renderer, so the entire design is 
 agent writes only the standard vocabulary - components and semantic tokens like `tone="warn"` - and
 the host decides what each one looks like.
 Everything the agent emits is data, so the host stays in control of what runs.
-Mosaic is delivered over MCP as a `ui://` resource and rendered by a `render()` you drop into your
-app, and it fits alongside MCP Apps (SEP-1865) - Mosaic can be the artifact an MCP tool returns.
+Mosaic is delivered inline - a fenced artifact in the model's reply that the host's message renderer
+draws natively - and the model gets the schema right up front through three introspection tools
+(`mosaic_ls`, `mosaic_cat`, `mosaic_validate`) delivered over MCP or any tools API.
 
 ---
 
@@ -72,7 +85,7 @@ Two concrete interfaces, before the design details.
 ### 2.1 A plan, composed from building blocks
 
 ```mosaic v=1 id=q3-plan
-<Stack gap="4">
+<Stack>
   <Heading>Q3 launch plan</Heading>
   <Timeline items={[
     {date:"2026-07-08", title:"Spec freeze",  tone:"ok"},
@@ -100,9 +113,9 @@ expands to exactly this - but that lives in the host, not in Mosaic.
 ### 2.2 An interface with real interaction
 
 ```jsx
-<Card gap="3">
+<Card>
   <Slider label="Number of eggs" bind:state="eggs" min={0} max={144} step={1} />
-  <Text size="xl">Total: {expr("formatCurrency(eggs * 0.50)")}</Text>
+  <Text>Total: {expr("formatCurrency(eggs * 0.50)")}</Text>
   <Text if:show="eggs > 60" tone="warn">Bulk order - wholesale pricing applies.</Text>
   <Button on:event={{ click: { action: "order", args: { eggs: expr("eggs"), total: expr("eggs * 0.50") } } }}>
     Place order
@@ -165,27 +178,27 @@ so no color, spacing, or font value ever travels:
   "mosaic_version": "1.0",
   "interactive": true,
   "components_supported": ["DataTable", "Chart", "Tree", "Board", "Timeline", "Stat"],
-  "directives_supported": ["bind:state", "from:state", "from:expr", "if:show", "for:each", "on:event", "theme:scope", "slot:name", "key"],
+  "directives_supported": ["bind:state", "from:state", "from:expr", "if:show", "for:each", "on:event", "slot:name", "key"],
   "permissions": { "Embed": "deny" }
 }
 ```
 
-The semantic tokens the agent writes (`tone="warn"`, `gap="3"`, `radius="md"`,
-`token("color.accent")`) are standardized by Mosaic itself, so they never appear in the manifest
-either.
+The semantic tokens the agent writes (`tone="warn"`, `variant="label"`) are standardized by Mosaic
+itself, so they never appear in the manifest either.
 The host's renderer maps each name to its own design system however it likes; the reference renderer
 accepts a token-to-value map as render-time configuration ([§7.2](#72-the-public-api)).
-Nothing in the artifact or the manifest hardcodes a value.
+Nothing in the artifact or the manifest hardcodes a value, and the format carries no spacing, size,
+or typography knobs - the host owns density, type, and chrome.
 `components_supported` lists the rich components the renderer draws natively; anything else falls
-back through `decomposeTo` ([§4.3](#43-data--viz-components)).
+back through `decompose` ([§4.3](#43-data--viz-components)).
 
 ### 3.4 The trust boundary
 
 The boundary sits between the **model + artifact** (untrusted) and the **host** (trusted).
 Three properties hold by construction:
 
-1. **Mosaic cannot express executable code.** Braces admit only JSON literals plus two whitelisted
-   calls, `token(...)` and `expr(...)`; both are interpreted, neither is executed as code
+1. **Mosaic cannot express executable code.** Braces admit only JSON literals plus the interpreted
+   `expr(...)`; it is interpreted, never executed as code
    ([§8](#8-security)).
 2. **Every action is the host's.** An `on:event` hands the host a named intent; the artifact cannot
    reach the network, call a tool, or navigate on its own.
@@ -255,7 +268,7 @@ Layout freedom with zero styling freedom is the guarantee HTML cannot give.
 
 ### 4.3 Data & viz components
 
-The reusable rich widgets, each with an open, domain-neutral schema and a normative `decomposeTo`
+The reusable rich widgets, each with an open, domain-neutral schema and a normative `decompose`
 fallback so it still renders where the renderer can't draw it (a `Chart` degrades to its `alt`; a
 `DataTable` to a plain table).
 
@@ -301,8 +314,8 @@ on every node, and React's dominance in training data makes JSX emission highly 
 - **Tags.** PascalCase only; lowercase HTML tags rejected at compile time. Self-closing permitted
   (and cheaper).
 - **Attributes.** `name="..."` or `name={literal}`. No `class`, `style`, or `className`.
-- **Braces.** Only JSON-compatible literals plus two whitelisted calls: `token("color.bg")` and
-  `expr("eggs * 0.5")`. Arrow functions, identifiers, member access, template literals, and `new`
+- **Braces.** Only JSON-compatible literals plus the whitelisted `expr("eggs * 0.5")` call.
+  Arrow functions, identifiers, member access, template literals, and `new`
   are rejected. This is the compile-time safety guarantee ([invariant
   1](../ARCHITECTURE.md#invariants)).
 - **Children.** Positional; whitespace insignificant; text children become `text` nodes.
@@ -404,10 +417,10 @@ differs by specifying a precise, CEL-grounded catalog A2UI leaves vague.
 
 `on:event` fires an action on an event, and it is one of two things:
 
-- **A local mutation** - `state.set("eggs", value)` / `state.toggle("open")` - which Mosaic applies
+- **A local mutation** - `set(eggs, value)` / `toggle(open)` - which Mosaic applies
   to its own store; dependent derived values and `if:show` re-evaluate; no round-trip.
   Both accept the same state paths as `bind:state` ([§6.1](#61-state-derived-values-conditionals-lists)):
-  `state.set('data.view', 'grid')`, `state.toggle('files[2].checked')`.
+  `set(data.view, 'grid')`, `set(count, count + 1)`, `toggle(files[2].checked)`.
 - **A named host intent** - `{ action: "order", args: {...} }` - which Mosaic hands to the host and
   stops. The host decides what to do (call a tool, ask the model, navigate) under its own policy.
 
@@ -419,39 +432,34 @@ Only `state.*` and host intents cross a boundary, and only a host intent leaves 
 
 ## 7. Delivery & integration
 
-Mosaic's core is transport-independent: the AST and `render()` work with no MCP at all.
+Mosaic's core is transport-independent: the IR and `render()` work with no MCP at all.
 A first-party app whose agent and renderer live together just calls `render(source)` inline
 ([§7.2](#72-the-public-api)).
-MCP is the **interop** layer - how a third-party agent's UI reaches a host that never pre-integrated
-it - and `mosaic-mcp` is an optional package layered on the core, not a dependency of the format.
+What needs delivering is not a rendering but two texts: the artifact itself, and the schema
+knowledge that lets the model write it correctly.
 
-### 7.1 Delivery over MCP
+### 7.1 Delivery
 
-An artifact-producing MCP tool returns the AST as an embedded resource, and each host renders it the
-best way it can:
+The artifact travels **inline in the model's reply** - a ` ```mosaic ` fence in the ordinary
+message stream:
 
-```jsonc
-{
-  "type": "resource",
-  "resource": {
-    "uri": "ui://mosaic/q3-plan",
-    "mimeType": "application/vnd.mosaic+json",
-    "text": "{ \"mosaic_version\":\"1.0\", \"id\":\"q3-plan\", \"root\": { /* ... */ } }"
-  }
-}
+````text
+```mosaic v=1 id=q3-plan
+<Stack>…</Stack>
 ```
+````
 
-- An **Mosaic-aware host** recognizes the mimeType, parses the AST, and renders through its own
-  components - no iframe. This mirrors how a native host (e.g. an ACP-based coding app) renders a
-  typed plan today.
-- An **MCP-Apps host** that does not know Mosaic gets a second representation,
-  `text/html;profile=mcp-app`, whose HTML is a small runtime that renders the same AST inside the
-  standard sandboxed iframe.
+The host's message renderer detects the fence and renders it natively - the same seam where it
+already special-cases code blocks - streaming the prefix progressively as tokens arrive.
+The fence `id` is stable across regenerations, so a new version of an artifact replaces the
+rendered tree instead of appending a second copy.
+Nothing renders over a transport, and no resource protocol is involved: the artifact is text until
+the host's renderer draws it.
 
-SEP-1865's capability list (`mimeTypes`) is open and `_meta.ui.resourceUri` is mimeType-agnostic, so
-`application/vnd.mosaic+json` is a legitimate extension of MCP Apps, not a fork.
-This makes the coexistence claim concrete: **Mosaic is the artifact an MCP tool returns.**
-A host intent from `on:event` is relayed back through the same MCP client under host policy.
+The schema knowledge travels as **three introspection tools** - `mosaic_ls`, `mosaic_cat`,
+`mosaic_validate` (`@mosaicjs/ai`) - over MCP or any provider's tools API,
+plus the agent skill (or a generated system prompt) that teaches emission.
+MCP's role in Mosaic is exactly those tools: it carries introspection, never renderings.
 
 ### 7.2 The public API
 
@@ -462,7 +470,7 @@ render(
   source: string | MosaicDocument,          // inline Mosaic source, or a compiled IR
   opts: {
     manifest: HostManifest;
-    onAction: (action: string, args?: unknown) => void;
+    onIntent: (name: string, args?: unknown) => void;
     components?: MosaicComponents;          // the host's own block components, by type
   }
 ): React.ReactElement
@@ -483,18 +491,19 @@ walk(doc, visitor, manifest): T     // the portable contract every renderer impl
 ```
 
 `walk` maps one resolved node to one host-native surface (a SwiftUI view, an ANSI string), applying
-`decomposeTo` for unsupported components before the visitor sees them.
+`decompose` for unsupported components before the visitor sees them.
 `mosaic-react`'s `render()` is the worked example; a new surface writes only a `NodeVisitor`.
 A `.mosaic` file is loaded with `parse` and rendered with the same `render()` - the MCP resource
 text and the file bytes are the same thing.
 
-### 7.3 Integrating into a host (t3-code as the worked example)
+### 7.3 Integrating into a host (a worked example)
 
 The seam is the host's message renderer.
-In t3-code, the raw MCP `resource` already reaches the client untouched, so integration is: detect a
-Mosaic resource in the tool result, call `render(text, { manifest, onAction })` in place of the JSON
-dump, map the semantic tokens onto the app's existing design system, and route `onAction` through
-the app's existing "start a turn" / "answer a request" commands.
+Take a generic chat host whose raw MCP `resource` already reaches the client untouched: integration
+is to detect a Mosaic resource in the tool result, render it with `<Mosaic source={text}
+onIntent={…} />` in place of the JSON dump, map the semantic tokens onto the app's existing design
+system through the host's own components, and route `onIntent` through the app's existing "start a
+turn" / "answer a request" commands.
 Almost nothing changes server-side; the work is a renderer drop-in.
 
 ---
@@ -505,7 +514,7 @@ Mosaic's security rests on three claims, each enforced at a distinct layer ([inv
 1-3](../ARCHITECTURE.md#invariants)):
 
 1. **Mosaic cannot express executable code (parse-time).** The grammar admits only JSON literals
-   plus the interpreted calls `token(...)` and `expr(...)`; lowercase tags, `style`, `class`, and
+   plus the interpreted `expr(...)` call; lowercase tags, `style`, `class`, and
    event-handler attributes are rejected. Every downstream stage operates on a code-free AST.
 2. **`expr` is safe by construction.** It is CEL-class - non-Turing-complete, terminating,
    side-effect-free - AST-interpreted (never `eval`), statically cost-bounded, with recursion and
@@ -558,13 +567,14 @@ Mosaic sits among several declarative-UI efforts and borrows from each:
 - **A2UI** - the nearest neighbor for declarative local interaction. Mosaic shares the posture and
   adds a precisely specified expression catalog and a builder-owned theme, on a JSX wire, compatible
   at the AST level.
-- **MCP Apps (SEP-1865)** - the transport Mosaic rides; **Mosaic can be the artifact an MCP tool
-  returns** ([§7.1](#71-delivery-over-mcp)).
+- **MCP Apps (SEP-1865)** - prior art for tool-delivered interfaces. Mosaic takes the other road:
+  the artifact rides the reply stream itself ([§7.1](#71-delivery)), and MCP carries only the
+  introspection tools.
 - **Markdown and HTML** - what agents emit today. Mosaic offers a cheaper, themeable, safe option
   for the spatial cases where a picture reads better than text.
 
-Mosaic is meant to fit alongside these, not replace them: it rides MCP Apps' transport and can be
-transformed to Adaptive Cards or A2UI downstream.
+Mosaic is meant to fit alongside these, not replace them: it can be transformed to Adaptive Cards
+or A2UI downstream.
 
 ---
 
@@ -594,13 +604,13 @@ browser (historical and inactive), in formal publication.
   language.
 - **The expr catalog.** Whether the function set is the right set, and where the static cost bound
   should sit, is empirical. Recursion and user functions stay forbidden regardless.
-- **The macro mechanism.** Whether host macros want a shared registry format, or stay fully
-  host-private, is unresolved.
+- **The macro mechanism.** Resolved in 0.7: a macro is a `BlockDefinition` with an `expandsTo`
+  template, registered through `createRegistry`, and shared as plain data.
 - **The no-JS ceiling.** Mosaic can never host a live notebook, an in-artifact editor, or a game;
   those need real code, and `<Embed>` is the escape hatch. Markdown is a report, Mosaic is an
   interface, a Turing-complete artifact is a different beast - MCP Apps already exists for it.
 - **Bring-your-own-renderer parity.** Mosaic ships one reference renderer; other surfaces are the
-  builder's to write, and component coverage will vary. `decomposeTo` manages the gap; it does not
+  builder's to write, and component coverage will vary. `decompose` manages the gap; it does not
   erase it.
 
 ---
@@ -609,8 +619,8 @@ browser (historical and inactive), in formal publication.
 
 Mosaic stands on a long lineage: **Thariq Shihipar**, whose essay and gallery catalyzed this; the
 **Adaptive Cards** team at Microsoft (the host-themed, catalog-safe declarative UI prior art); the
-**MCP Apps / SEP-1865** working group, whose `ui://` scheme and iframe trust model Mosaic rides for
-delivery; **Google A2UI**, the nearest prior art for declarative local interaction; the **Vega /
+**MCP Apps / SEP-1865** working group, whose iframe trust model shaped `<Embed>`'s posture;
+**Google A2UI**, the nearest prior art for declarative local interaction; the **Vega /
 Vega-Lite** teams and the **CEL** authors, whose bounded-expression design grounds the `expr` model;
 **Pandoc** (the `reader -> AST -> writer` architecture); the **React** core team; and **safe-mdx**,
 the existence proof that a JSX-shaped format renders with no JavaScript evaluation.

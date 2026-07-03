@@ -1,11 +1,11 @@
 ```mosaic v=1 id=dependency-upgrades
-<Stack gap="4" state={{ d1: true, d2: true, d3: true, d4: true }}>
+<Stack state={{ d1: true, d2: true, d3: true, d4: true }}>
   {/* The upgrade-triage artifact: four outdated packages, one of them a real
       decision. The breaking-change callout appears only while vitest is
       selected, and the button count folds over the same checkboxes that the
       intent args are computed from. */}
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Heading level={2}>Dependency upgrades</Heading>
     <Badge>4 outdated</Badge>
     <Badge tone="bad">1 breaking</Badge>
@@ -14,40 +14,42 @@
     From pnpm outdated at the workspace root. Everything is covered by the existing suite except the vitest major.
   </Text>
 
-  <Stack gap="2">
-    <Stack direction="horizontal" gap="2">
-      <Checkbox bind:state="d1" label="next 16.2.10 → 16.3.2" />
+  <Stack>
+    <Stack direction="horizontal">
+      <Checkbox checked={d1} label="next 16.2.10 → 16.3.2" />
       <Badge tone="ok">minor</Badge>
     </Stack>
-    <Stack direction="horizontal" gap="2">
-      <Checkbox bind:state="d2" label="react 19.2.4 → 19.2.7" />
+    <Stack direction="horizontal">
+      <Checkbox checked={d2} label="react 19.2.4 → 19.2.7" />
       <Badge tone="ok">patch</Badge>
     </Stack>
-    <Stack direction="horizontal" gap="2">
-      <Checkbox bind:state="d3" label="tailwindcss 4.1.3 → 4.2.0" />
+    <Stack direction="horizontal">
+      <Checkbox checked={d3} label="tailwindcss 4.1.3 → 4.2.0" />
       <Badge tone="ok">minor</Badge>
     </Stack>
-    <Stack direction="horizontal" gap="2">
-      <Checkbox bind:state="d4" label="vitest 2.1.9 → 3.2.4" />
+    <Stack direction="horizontal">
+      <Checkbox checked={d4} label="vitest 2.1.9 → 3.2.4" />
       <Badge tone="bad">breaking</Badge>
     </Stack>
   </Stack>
 
-  <Callout if:show="d4" tone="bad">
-    vitest 3 removes the workspace-file config and renames coverage.provider. Our vitest.config.ts and three CI steps need edits - keep it selected and I will include that migration in the same PR.
-  </Callout>
+  {d4 && (
+    <Callout tone="bad">
+      vitest 3 removes the workspace-file config and renames coverage.provider. Our vitest.config.ts and three CI steps need edits - keep it selected and I will include that migration in the same PR.
+    </Callout>
+  )}
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Button
-      tone="primary"
-      on:event={{ click: { action: "upgradeDeps", args: {
-        count: expr("sum(map([d1, d2, d3, d4], c, c ? 1 : 0))"),
-        packages: expr("filter([d1 ? 'next' : '', d2 ? 'react' : '', d3 ? 'tailwindcss' : '', d4 ? 'vitest' : ''], p, p != '')"),
-        breaking: expr("d4")
-      } } }}>
-      {expr("concat('Upgrade ', sum(map([d1, d2, d3, d4], c, c ? 1 : 0)), ' packages')")}
+      variant="primary"
+      onClick={upgradeDeps({
+        count: [d1, d2, d3, d4].filter(c => c).length,
+        packages: [d1 ? 'next' : '', d2 ? 'react' : '', d3 ? 'tailwindcss' : '', d4 ? 'vitest' : ''].filter(p => p != ''),
+        breaking: d4
+      })}>
+      {`Upgrade ${[d1, d2, d3, d4].filter(c => c).length} packages`}
     </Button>
-    <Button tone="subtle" on:event={{ click: { action: "snoozeUpgrades", args: { until: "next week" } } }}>
+    <Button variant="subtle" onClick={snoozeUpgrades({ until: "next week" })}>
       Remind me next week
     </Button>
   </Stack>

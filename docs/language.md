@@ -14,7 +14,7 @@ A `.mosaic` file (and an artifact inline in a model reply) is a fenced block:
 
 ````text
 ```mosaic v=1 id=q3-plan
-<Stack gap="4">
+<Stack>
   …
 </Stack>
 ```
@@ -50,37 +50,38 @@ Three value forms:
 
 `class`, `className`, and `style` are rejected with `FORBIDDEN_ATTRIBUTE`: styling comes from the host, never the artifact ([invariant 6](../ARCHITECTURE.md#invariants)).
 
-An attribute whose name is a [directive](interactivity.md) (`bind:state`, `for:each`, `on:event`, …) lands in the node's `directives`, everything else in `props`.
+Interactivity is written as ordinary JSX and compiled to the IR's directives: `value={path}` / `checked={path}` on a control becomes `bind:state`, `on[Event]` props become `on:event`, `key={…}` becomes the `key` directive; see [State and events](interactivity.md).
 
 ### Braces
 
-Braces admit **JSON-compatible literals plus exactly two interpreted calls** - nothing else:
+Braces admit **JSON-compatible literals and a bounded expression subset** - parsed and interpreted, never executed:
 
 ```jsx
-<Chart series={[{ points: [["Mon", 4], ["Tue", 7]] }]} />   // arrays, objects, numbers, strings, booleans, null
-<Text color={token("color.accent")} />                       // a theme-token reference
-<Stat value={expr("seats * 16")} />                          // a bounded expression
+<Chart data={[{ label: "Mon", value: 4 }]} />   // arrays, objects, numbers, strings, booleans, null
+<Stat value={seats * 16} />                     // a bounded expression -> { "$expr": "seats * 16" }
+<Field label={`Seats: ${seats}`} />             // template literal -> { "$expr": "concat('Seats: ', seats)" }
 ```
 
-`token("…")` and `expr("…")` each take one string literal and compile to the wire forms `{ "$token": "…" }` and `{ "$expr": "…" }`.
-Both are interpreted downstream; neither is executed as code.
+The expression subset covers arithmetic, comparison, `&& || !`, ternaries, `in`, member access and indexing, list literals, template literals, the [`expr` function catalog](expr.md), and JS-natural method spellings (`rows.filter(r => r.open)`, `rows.length`, `.slice`, `.join`, `.includes`, `.toFixed`, …) that the compiler rewrites to canonical `expr` source.
+Every brace expression compiles to the wire form `{ "$expr": "…" }`, interpreted downstream.
+Arrow functions are valid only as `map`/`filter`/`reduce`/`sortBy`/`some`/`every` callbacks.
 
-Rejected, each with a positioned `CODE_IN_BRACES` error:
+Rejected, each with a positioned teaching error:
 
-- identifiers: `{eggs * 2}` - write `expr("eggs * 2")`
-- arrow functions: `{(x) => x}`
-- template literals: `` {`total: ${n}`} ``
-- spread of identifiers: `{...props}`
-- method calls anywhere, including inside object literals
+- assignment and mutation: `{seats = 3}`, `{seats++}` (`INVALID_EXPRESSION`)
+- calls outside the catalog: `{fetchData()}` (`UNKNOWN_FUNCTION`, listing the catalog)
+- arrows outside fold callbacks (`INVALID_ARROW`)
+- `new`, regex literals, spread, `await`, comma expressions (`INVALID_EXPRESSION`)
 
-Object keys may be bare identifiers or quoted strings.
-`/* … */` comments are allowed inside brace literals (a multiline array with notes) and are discarded.
+Object keys may be bare identifiers or quoted strings, and `{ seats }` shorthand expands.
+`/* … */` comments are allowed inside braces and are discarded.
 
 ### Children
 
 - Text runs collapse whitespace to single spaces; pure-whitespace runs between elements vanish.
-- `{expr("…")}` and `{"literal"}` are valid children; each becomes a text node.
-  Anything else in a brace child fails with `INVALID_CHILD`.
+- `{expression}` becomes a text node carrying `{ "$expr": "…" }`; `{"literal"}` becomes plain text.
+- `{cond && <El/>}` and `{cond ? <A/> : <B/>}` compile to `if:show` on the element(s); either ternary branch may be `null`.
+- `{list.map((item) => <El key={…}/>)}` (optionally `(item, i)`) compiles to `for:each`; the callback must return a single element.
 - `{/* … */}` comments are discarded.
 
 ### Compile errors
@@ -91,11 +92,15 @@ The codes:
 | Code                                                                                                             | Meaning                                                     |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `LOWERCASE_TAG`                                                                                                  | HTML tag; blocks are PascalCase                             |
+| `FRAGMENT`                                                                                                       | `<>…</>`; wrap siblings in a `Stack`                        |
 | `FORBIDDEN_ATTRIBUTE`                                                                                            | `class` / `className` / `style`                             |
-| `CODE_IN_BRACES`                                                                                                 | identifier, arrow, template literal, or spread in braces    |
-| `INVALID_LITERAL`                                                                                                | malformed brace literal (bad number, missing `:` or `,`, …) |
-| `INVALID_CHILD`                                                                                                  | a brace child that is not text or `expr(...)`               |
-| `INVALID_DIRECTIVE`                                                                                              | a directive value of the wrong shape                        |
+| `LEGACY_DIRECTIVE`                                                                                               | a directive-as-attribute (`if:show=`, …); use the JSX forms |
+| `INVALID_EXPRESSION`                                                                                             | assignment, `new`, regex, spread, malformed expression      |
+| `UNKNOWN_FUNCTION`                                                                                               | a call outside the `expr` catalog                           |
+| `INVALID_ARROW`                                                                                                  | an arrow function outside a fold callback                   |
+| `INVALID_HANDLER`                                                                                                | an `on[Event]` value outside the four handler forms         |
+| `INVALID_STATE`                                                                                                  | `state={…}` that is not a literal object                    |
+| `INVALID_CHILD` / `INVALID_KEY`                                                                                  | a brace child or `key` of the wrong shape                   |
 | `MISMATCHED_TAG` / `UNTERMINATED_TAG`                                                                            | close-tag errors                                            |
 | `UNTERMINATED_STRING` / `UNTERMINATED_COMMENT` / `INVALID_ESCAPE`                                                | string and comment errors                                   |
 | `EXPECTED_ELEMENT` / `EXPECTED_TAG` / `EXPECTED_ATTRIBUTE` / `EXPECTED_VALUE` / `EXPECTED_GT` / `EXPECTED_BRACE` | structural expectations                                     |
@@ -125,7 +130,7 @@ type MosaicDocument = {
 };
 ```
 
-A `PropValue` is any JSON value that may embed `{ $expr: "…" }` and `{ $token: "…" }` refs.
+A `PropValue` is any JSON value that may embed `{ $expr: "…" }` refs.
 Text is a node too: `type: '#text'` with the string (or an `$expr` ref) in `props.value`.
 
 What each optional field is for:

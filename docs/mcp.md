@@ -1,88 +1,82 @@
-# Delivery over MCP
+# Delivery and AI tools
 
-Mosaic's core is transport-independent: `render(source)` needs no MCP, and a first-party app whose agent and renderer live together never touches this page.
-MCP is the **interop** layer - how a third-party agent's artifact reaches a host that never pre-integrated it ([proposal §7.1](proposal.md#71-delivery-over-mcp)).
-`@mosaic/mcp` is the optional package for that seam; the format does not depend on it.
+Mosaic needs no transport of its own.
+The model emits the artifact **inline in its reply** - a ` ```mosaic ` fence in the ordinary message stream - and the host's message renderer detects the fence and renders it, the same seam where it already special-cases code blocks or images.
+There is no render-over-MCP, no resource protocol, and no iframe: the artifact is text until your renderer draws it.
 
-## The resource
+`@mosaicjs/ai` is the package that plugs the **introspection loop** into whatever agent runtime you use.
+MCP is one adapter among several; what travels over it is tools, never renderings.
 
-An artifact-producing MCP tool returns the IR as an embedded resource:
+## Delivery: the fenced artifact
+
+The model writes the artifact where its prose would go:
+
+````text
+Here is the estimator you asked for:
+
+```mosaic v=1 id=pricing
+<Card state={{ seats: 25 }}>
+  <Slider label="Seats" min={1} max={200} value={seats} />
+  <Stat label="Monthly" value={`$${seats * 16}`} />
+</Card>
+```
+````
+
+The host side is a fence handler in the message renderer: when a fence's language is `mosaic`, hand its text to your renderer with the message's streaming flag, and route the artifact's intents into your app.
+[The React library](react.md) shows this wiring for the provided implementation.
+
+Two properties make this work well:
+
+- **Streaming.** The fence arrives token by token; `isStreaming` renders the prefix progressively, so the artifact assembles live instead of popping in at the end.
+- **Stable ids.** The fence `id=…` is stable across regenerations: when the model emits a new version of the same artifact it reuses the id, and the host replaces the rendered tree instead of appending a second copy.
+
+The model learns to emit this from the **skill** ([skills/mosaic](../skills/mosaic/SKILL.md)) or, where skills are unavailable, from `mosaicSystemPrompt()` below.
+
+## The introspection tools
+
+MCP's job in Mosaic is exactly three tools - `mosaic_ls`, `mosaic_cat`, `mosaic_validate` - and nothing else.
+They are the product's core quality mechanism: the model lists blocks, reads their exact schemas, and validates a draft before emitting, so it never guesses a prop.
+
+| Tool              | What it returns                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `mosaic_ls`       | the block catalog, one line each, grouped by kind; optional `kind` filter                    |
+| `mosaic_cat`      | full prop schemas for one or more blocks (comma/space separated) plus a minimal example each |
+| `mosaic_validate` | every compile and validation error for a draft, with fix hints - or confirmation it is sound |
+
+They keep identical names, descriptions, and text outputs across every provider.
+Every constructor takes an optional `registry` ([host vocabulary](custom-blocks.md)), so host-defined blocks appear in all three - and `mosaic_ls` marks host blocks `(host)`.
+
+`@mosaicjs/ai` (root) exposes the framework-neutral descriptors:
 
 ```ts
-import { toResource } from "@mosaic/mcp";
+import { mosaicToolDescriptors } from "@mosaicjs/ai";
 
-// inside a tool handler
-return { content: [toResource(doc)] };
+const tools = mosaicToolDescriptors(); // or mosaicToolDescriptors(registry) to include host blocks
 ```
 
-which produces:
+One subpath per provider style, each built from those same descriptors:
 
-```jsonc
-{
-  "type": "resource",
-  "resource": {
-    "uri": "ui://mosaic/q3-plan",
-    "mimeType": "application/vnd.mosaic+json",
-    "text": "{\"mosaic_version\":\"1.0\",\"id\":\"q3-plan\",\"root\":{…}}"
-  }
-}
-```
+- **`@mosaicjs/ai/vercel`** - `mosaicTools(registry?)` returns an AI SDK `ToolSet`, ready to spread into `streamText`:
 
-Each field has one job:
+  ```ts
+  import { mosaicTools } from "@mosaicjs/ai/vercel";
 
-- **`uri`** is the artifact's stable address in the host's resource space - `ui://mosaic/` plus the artifact id.
-  Because the id is stable across regenerations, a new version of the same artifact arrives at the **same** URI, and the host replaces the rendered tree instead of appending a second copy - the same replacement story as the fence id, carried into the transport.
-  The `ui://` scheme is the MCP Apps convention marking a resource as an interface to render, not data; SEP-1865's `_meta.ui.resourceUri` points at exactly this.
-- **`mimeType`** is how a host recognizes Mosaic at all - the one-line detection check below.
-- **`text`** is the artifact itself: the [canonical mosaic-json](language.md#canonical-serialization).
+  const result = streamText({ model, tools: { ...mosaicTools() } });
+  ```
 
-## The host side
+- **`@mosaicjs/ai/mcp`** - `registerMosaicTools(server, registry?)` for the official `@modelcontextprotocol/sdk`, plus the raw descriptors for custom MCP servers.
+- **`@mosaicjs/ai/prompt`** - `mosaicSystemPrompt(registry?)` returns the compact emission contract as a system prompt, for providers where tools are unavailable.
+  It is generated from the same source as the skills, so the two never drift.
 
-A Mosaic-aware host detects the resource and renders it natively - no iframe:
+## The correction loop
 
-```ts
-import { isMosaicResource } from "@mosaic/mcp";
-import { render } from "@mosaic/react";
+The same `validate` that powers `mosaic_validate` runs in the host's renderer, and the two ends meet:
 
-for (const item of toolResult.content) {
-  if (isMosaicResource(item)) {
-    return render(item.resource.text, { manifest, theme, components, onAction });
-  }
-}
-```
+1. Before emitting, the model drafts and calls `mosaic_validate`; errors come back with paths and fix hints, and it repairs the draft.
+2. After emitting, the host's `<Mosaic onDiagnostics>` surfaces anything that still slipped through - rendering is best-effort and never blanks, and the diagnostics feed back to the model as ordinary conversation, closing the loop.
 
-`isMosaicResource` matches on the media type, so the check is one line in your message renderer - the same seam where you already special-case images or code blocks.
+## Keep the artifact source as the model's surface
 
-### Keep the IR out of the model's context
-
-The resource's mosaic-json is addressed to your **renderer**, never to the model - the model's only surface is the Mosaic pattern.
-Many hosts echo tool results back into the model's context; for a Mosaic resource, do not echo the JSON.
-Render it, and if the model needs the artifact in context - to discuss it, revise it, or regenerate it - hand it the pattern instead: `serialize(doc, { format: 'jsx' })`, or the block's `alt` when a mention is enough.
+The model's only surface is the mosaic-jsx pattern - never the IR.
+When the model needs an existing artifact in context (to discuss, revise, or regenerate it), hand it the pattern: `serialize(doc, { format: "jsx" })`, or the block's `alt` when a mention is enough.
 The jsx form is also the cheaper one, so the correct representation and the token-efficient one are the same choice.
-
-## The HTML bridge
-
-A host that speaks MCP Apps (SEP-1865) but does not know Mosaic still gets a rendering.
-`toHtmlBridge(doc)` returns a second resource, `text/html;profile=mcp-app`: a small self-contained page that carries the same IR and draws a static rendering inside the standard sandboxed iframe.
-
-The bridge is deliberately static - no expression loop, no state - because a host that wants the interactive artifact should render the IR natively.
-It is the compatibility floor, not the product.
-
-SEP-1865's `mimeTypes` capability list is open and `_meta.ui.resourceUri` is mimeType-agnostic, so `application/vnd.mosaic+json` is a legitimate extension of MCP Apps, not a fork: Mosaic is the artifact an MCP tool returns.
-
-## Intent relay
-
-`createBridge(client, manifest)` wires both directions under the host's policy:
-
-```ts
-import { createBridge } from "@mosaic/mcp";
-
-const bridge = createBridge({ dispatch: (action, args) => relayToHost(action, args) }, manifest);
-
-bridge.deliver(doc); // [native resource, html bridge]
-bridge.deliver(doc, { htmlBridge: false }); // native only
-bridge.dispatch("order", { eggs: 80 }); // relays - or throws if manifest.permissions denies it
-```
-
-`dispatch` enforces `manifest.permissions` before relaying: an intent the host's policy marks `deny` throws instead of crossing.
-This is the same rule as everywhere else in Mosaic - every action is the host's ([invariant 3](../ARCHITECTURE.md#invariants)) - applied at the transport seam.

@@ -8,10 +8,10 @@ body:
     attributes:
       label: Package
       options:
-        - "@mosaic/core"
-        - "@mosaic/react"
-        - "@mosaic/mcp"
-        - "@mosaic/ansi"
+        - "@mosaicjs/core"
+        - "@mosaicjs/react"
+        - "@mosaicjs/mcp"
+        - "@mosaicjs/ansi"
         - schema/ (JSON Schemas)
         - tools/
         - other / unknown

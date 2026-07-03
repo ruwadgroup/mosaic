@@ -1,4 +1,4 @@
-// @mosaic/core - the framework-agnostic heart of Mosaic.
+// @mosaicjs/core - the framework-agnostic heart of Mosaic.
 //
 // The Mosaic compiler (mosaic-jsx -> IR), the IR types, validate, resolve, the
 // expr evaluator, walk(), the block registry, and the Host Manifest.
@@ -6,7 +6,11 @@
 
 import { MOSAIC_VERSION, type MosaicDocument, type MosaicNode } from './ast.js';
 import { JsxError, type ParseError, parseJsx } from './jsx.js';
+import type { HostManifest } from './manifest.js';
+import { DEFAULT_REGISTRY, type MosaicRegistry } from './registry.js';
 import { stripFence, toCanonicalJson, toJsxSource, toMosaicFile } from './serialize.js';
+import { completePartial } from './streaming.js';
+import { type ValidationResult, validateDocument } from './validate.js';
 
 export {
   MOSAIC_VERSION,
@@ -15,7 +19,6 @@ export {
   TEXT_TYPE,
   DIRECTIVE_NAMES,
   isExprRef,
-  isTokenRef,
   isTextNode,
   textNode,
 } from './ast.js';
@@ -28,7 +31,6 @@ export type {
   MosaicDocument,
   MosaicNode,
   PropValue,
-  TokenRef,
 } from './ast.js';
 
 export {
@@ -46,13 +48,50 @@ export type { ExprValue } from './expr.js';
 export { JsxError } from './jsx.js';
 export type { ParseError } from './jsx.js';
 
+export { completePartial } from './streaming.js';
+
 export { parseFence, stripFence, toCanonicalJson, toJsxSource, toMosaicFile } from './serialize.js';
 
-export { BLOCK_REGISTRY, blockSpec, isKnownBlock } from './registry.js';
-export type { BlockKind, BlockSpec } from './registry.js';
+export { defineBlockSchema } from './schema.js';
+export type {
+  BlockDefinition,
+  BlockKind,
+  InferBlockProps,
+  PropSpec,
+  PropTypeName,
+} from './schema.js';
 
-export { parseForEach, validate } from './validate.js';
+export { defaultBlocks } from './blocks.js';
+
+export {
+  DEFAULT_REGISTRY,
+  createRegistry,
+  describeBlock,
+  expandMacro,
+  listBlocks,
+} from './registry.js';
+export type {
+  BlockDefinitionJson,
+  BlockDescription,
+  BlockListing,
+  MosaicRegistry,
+  RegistryJson,
+} from './registry.js';
+
+export type { BlockPropTypes } from './blocks.gen.js';
+
+export { parseForEach } from './validate.js';
 export type { ValidationDiagnostic, ValidationResult } from './validate.js';
+
+/** Validate a document against the block registry (DEFAULT_REGISTRY unless a
+ *  registry of host vocabulary is passed) and the host manifest. */
+export function validate(
+  doc: MosaicDocument,
+  manifest: HostManifest,
+  opts?: { registry?: MosaicRegistry },
+): ValidationResult {
+  return validateDocument(doc, manifest, opts?.registry ?? DEFAULT_REGISTRY);
+}
 
 export { initialState, resolve, walk } from './resolve.js';
 export type { NodeVisitor, StateScope } from './resolve.js';
@@ -65,15 +104,8 @@ export {
 } from './state-path.js';
 export type { StatePath, StatePathSegment } from './state-path.js';
 
-export {
-  DEFAULT_MANIFEST,
-  DEFAULT_THEME,
-  compactManifest,
-  resolveToken,
-} from './manifest.js';
-export type { HostManifest, PermissionValue, Theme } from './manifest.js';
-
-// --- parse / serialize ---------------------------------------------------------
+export { DEFAULT_MANIFEST, compactManifest } from './manifest.js';
+export type { HostManifest, PermissionValue } from './manifest.js';
 
 export type ParseResult = { ok: true; doc: MosaicDocument } | { ok: false; errors: ParseError[] };
 
@@ -97,15 +129,37 @@ function fromJson(text: string): MosaicDocument {
 }
 
 /** Parse mosaic-jsx or mosaic-json (auto-detected; ```mosaic fences accepted)
- *  into a MosaicDocument. */
+ *  into a MosaicDocument.
+ *
+ *  `streaming` treats the source as a prefix still being emitted: it is cut
+ *  back to the last well-formed boundary and its open tags are closed, so an
+ *  artifact renders progressively as tokens arrive. */
 export function parse(
   source: string,
-  opts?: { format?: 'jsx' | 'json'; id?: string },
+  opts?: { format?: 'jsx' | 'json'; id?: string; streaming?: boolean },
 ): ParseResult {
   try {
-    const { id, body } = stripFence(source);
-    const format = opts?.format ?? (body.startsWith('{') ? 'json' : 'jsx');
-    if (format === 'json') return { ok: true, doc: fromJson(body) };
+    const { id, body: fenced } = stripFence(source);
+    const format = opts?.format ?? (fenced.startsWith('{') ? 'json' : 'jsx');
+    if (format === 'json') return { ok: true, doc: fromJson(fenced) };
+    let body = fenced;
+    if (opts?.streaming) {
+      const completed = completePartial(fenced);
+      if (completed === null) {
+        return {
+          ok: false,
+          errors: [
+            {
+              line: 1,
+              column: 1,
+              message: 'artifact still streaming; nothing renderable yet',
+              code: 'INCOMPLETE_ARTIFACT',
+            },
+          ],
+        };
+      }
+      body = completed;
+    }
     const root = parseJsx(body);
     return {
       ok: true,

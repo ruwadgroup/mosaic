@@ -46,7 +46,7 @@ Add the reactive loop, so a control can drive a derived value locally.
 
 Deliver over MCP, keeping the core transport-independent.
 
-- [x] `mosaic-mcp`: artifact-producing tools that return `ui://mosaic/*` resources (`application/vnd.mosaic+json`), the `text/html;profile=mcp-app` bridge for hosts that only speak MCP Apps, and the `on:event` intent relay under host policy.
+- [x] `@mosaicjs/ai/mcp`: artifact-producing tools that return `ui://mosaic/*` resources (`application/vnd.mosaic+json`), the `text/html;profile=mcp-app` bridge for hosts that only speak MCP Apps, and the `on:event` intent relay under host policy.
 
 **Exit criterion:** an interactive artifact produced by an MCP tool renders natively in a Mosaic-aware host and through the bridge in an unmodified MCP-Apps host, with every intent brokered by the host.
 
@@ -57,7 +57,7 @@ Deliver over MCP, keeping the core transport-independent.
 Widen from primitives to the rich components.
 
 - [ ] The rich components with `decomposeTo`: `DataTable`, `List`, `Tree`, `Board`, `Timeline`, `Calendar`, `Stat`, `Chart`, `VegaChart`, `Canvas`.
-- [ ] The host-macro mechanism (a host registers a name → primitive-subtree template, expanded before validation).
+- [x] The host-macro mechanism (`defineBlockSchema` with an `expandsTo` template, registered via `createRegistry` and expanded before validation).
 
 **Exit criterion:** a chart-heavy dashboard and a filterable `DataTable` render on web and degrade cleanly to text, with all data carried in the artifact.
 

@@ -1,5 +1,5 @@
 ```mosaic v=1 id=usage-cost
-<Stack gap="4" state={{
+<Stack state={{
     compact: 120,
     spend: [
       { kind: "Input (uncached)", tokens: "391k", rate: "$3.00 / 1M",  usd: 1.17 },
@@ -19,45 +19,47 @@
       the table shows, the context meter folds over the per-stage numbers, and
       the compaction slider re-projects the next 10 turns with plain arithmetic. */}
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Heading level={2}>Session cost breakdown</Heading>
-    <Badge tone="ok">{expr("concat(round(100 * 612 / (612 + 391)), '% cached')")}</Badge>
+    <Badge tone="ok">{`${round(100 * 612 / (612 + 391))}% cached`}</Badge>
   </Stack>
 
-  <Grid cols={12} gap="3">
-    <Stat slot:name="a" label="Session cost" value={expr("formatCurrency(sum(map(spend, s, s.usd)))")} />
-    <Stat slot:name="b" label="Cache hit rate" value={expr("concat(round(100 * 612 / (612 + 391)), '%')")} tone="ok" />
-    <Stat slot:name="c" label="Turns" value="24" />
+  <Grid cols={12}>
+    <Stat label="Session cost" value={formatCurrency(sum(spend.map(s => s.usd)))} />
+    <Stat label="Cache hit rate" value={`${round(100 * 612 / (612 + 391))}%`} tone="ok" />
+    <Stat label="Turns" value="24" />
   </Grid>
 
   <DataTable
     columns={["Kind", "Tokens", "Rate", "Cost"]}
-    rows={expr("map(spend, s, [s.kind, s.tokens, s.rate, formatCurrency(s.usd)])")} />
+    rows={spend.map(s => [s.kind, s.tokens, s.rate, formatCurrency(s.usd)])} />
 
-  <Card gap="2">
+  <Card>
     <Progress
-      label={expr("concat(sum(map(stages, s, s.k)), 'k of 200k context used')")}
-      value={expr("100 * sum(map(stages, s, s.k)) / 200")} />
+      label={`${sum(stages.map(s => s.k))}k of 200k context used`}
+      value={100 * sum(stages.map(s => s.k)) / 200} />
     <Chart
       type="bar"
       alt="Context tokens by stage: Explore 18k, Plan 6k, Implement 24k, Test 11k, Review 5k - implementation and exploration dominate the window."
-      series={[{ name: "Context (k tokens)", points: [
-        ["Explore", 18], ["Plan", 6], ["Implement", 24], ["Test", 11], ["Review", 5]
-      ] }]} />
+      data={[
+        { label: "Explore", value: 18 }, { label: "Plan", value: 6 },
+        { label: "Implement", value: 24 }, { label: "Test", value: 11 },
+        { label: "Review", value: 5 }
+      ]} />
   </Card>
 
-  <Card gap="2">
+  <Card>
     <Heading level={3}>Compaction</Heading>
-    <Field label={expr("concat('Compact when context exceeds ', compact, 'k')")}>
-      <Slider bind:state="compact" min={40} max={200} step={10} />
+    <Field label={`Compact when context exceeds ${compact}k`}>
+      <Slider value={compact} min={40} max={200} step={10} />
     </Field>
     <Text tone="subtle">
-      {expr("concat('At this session blended input rate ($1.35 per 1M after caching), the next 10 turns of context input cost about ', formatCurrency(10 * compact * 1.35 / 1000), ' compacted at ', compact, 'k, versus ', formatCurrency(10 * 200 * 1.35 / 1000), ' if the window runs to the 200k cap.')")}
+      {`At this session blended input rate ($1.35 per 1M after caching), the next 10 turns of context input cost about ${formatCurrency(10 * compact * 1.35 / 1000)} compacted at ${compact}k, versus ${formatCurrency(10 * 200 * 1.35 / 1000)} if the window runs to the 200k cap.`}
     </Text>
     <Button
-      tone="primary"
-      on:event={{ click: { action: "setCompaction", args: { thresholdK: expr("compact") } } }}>
-      {expr("concat('Compact at ', compact, 'k from now on')")}
+      variant="primary"
+      onClick={setCompaction({ thresholdK: compact })}>
+      {`Compact at ${compact}k from now on`}
     </Button>
   </Card>
 

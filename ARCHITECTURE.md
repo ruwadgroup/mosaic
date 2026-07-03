@@ -8,7 +8,7 @@ It is the companion to the [README](README.md) (the _what_) and the [ROADMAP](RO
 
 ## Who Mosaic is for
 
-Mosaic is builder-facing infrastructure: it is for the people building AI apps - Claude Code, t3-code, Codex, Cursor, and the like - not for end users.
+Mosaic is builder-facing infrastructure: it is for the people building AI apps - Claude Code, Codex, Cursor, and the like - not for end users.
 A builder brings their own renderer and their own aesthetic.
 Mosaic gives their agent general building blocks and a safe expression language to compose any interface, one reference framework to copy from, and an optional way to deliver the interface into the app over MCP.
 
@@ -73,16 +73,16 @@ Four packages; each depends only on the layers below it.
 mosaic-react (reference) · mosaic-ansi (text floor)
         │            (frameworks for the IR)
         ▼
-mosaic-mcp (optional delivery)  ──→  mosaic-core
+mosaic-ai (AI tools & delivery)  ──→  mosaic-core
                                     (Mosaic compiler · the IR · validate · resolve · expr · walk · registry · manifest)
 ```
 
-| Package        | Responsibility                                                                                                                                                                                           |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mosaic-core`  | The Mosaic compiler (`Mosaic -> IR`); the IR types; `validate`; `resolve`; the `expr` evaluator; `walk`; the block registry; the Host Manifest. No I/O. The one package everything depends on.           |
-| `mosaic-react` | The reference web framework: `render(source, opts)` and the React `NodeVisitor` over the IR.                                                                                                             |
-| `mosaic-mcp`   | Optional delivery: `ui://` artifact resources, the MCP-Apps HTML bridge, and `on:event` intent relay.                                                                                                    |
-| `mosaic-ansi`  | The text/degraded framework and the `decomposeTo` floor.                                                                                                                                                 |
+| Package        | Responsibility                                                                                                                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mosaic-core`  | The Mosaic compiler (`Mosaic -> IR`); the IR types; `validate`; `resolve`; the `expr` evaluator; `walk`; the block registry; the Host Manifest. No I/O. The one package everything depends on. |
+| `mosaic-react` | The headless React runtime: `<Mosaic>` and the `NodeVisitor` over the IR, drawing through the host's own components.                                                                           |
+| `mosaic-ai`    | The AI tool adapters (`mosaic_ls`/`mosaic_cat`/`mosaic_validate`): neutral descriptors plus `/vercel`, `/mcp`, and `/prompt`.                                                                  |
+| `mosaic-ansi`  | The text/degraded framework and the `decompose` floor.                                                                                                                                         |
 
 `mosaic-core` absorbs what were separate `mosaic-wire`, `mosaic-schema`, and `mosaic-host` packages; there is no separate `mosaic-presets` package because Mosaic ships no templates.
 A builder targeting SwiftUI, Compose, Flutter, a TUI, email, or Slack writes a framework against the same IR via `walk()`; `mosaic-react` is the worked example.
@@ -91,12 +91,12 @@ The normative JSON Schemas live in [`schema/`](schema/): `mosaic-v1.schema.json`
 ## Invariants
 
 These are the guarantees every implementation must preserve.
-A change that weakens one is a vision-level change and goes through the [design process](.github/CONTRIBUTING.md#design-changes), never an ordinary patch.
+A change that weakens one is a vision-level change and goes through the [design process](CONTRIBUTING.md#design-changes), never an ordinary patch.
 The proposal and the docs reference them by number.
 
 1. **Mosaic cannot express executable code.**
-   Braces admit only JSON-compatible literals plus two whitelisted calls, `token(...)` and `expr(...)`; both are interpreted, neither is executed as code.
-   Arrow functions, identifiers, member access, template literals, and lowercase HTML tags are rejected at compile time.
+   Braces admit JSON-compatible literals and a bounded expression subset that the compiler _interprets_ into the canonical `expr` language - still, nothing executes.
+   Everything outside that subset - assignment, arbitrary function calls, `new`, regex, spread, arrows outside fold callbacks - and lowercase HTML tags are rejected at compile time.
 
 2. **`expr` is safe by construction.**
    The expression language is CEL-class - non-Turing-complete, terminating, side-effect-free - AST-interpreted (never `eval`), statically cost-bounded, with recursion and user-defined functions forbidden and circular derivations rejected as DAG cycles.
@@ -115,7 +115,7 @@ The proposal and the docs reference them by number.
    The model never touches the IR in either direction: it neither emits mosaic-json nor receives it - everything model-facing (prompts, skills, tool results echoed into context) carries the Mosaic pattern.
 
 6. **The host owns the design.**
-   Every component is rendered by the host's own renderer, and artifacts reference tokens (`token("color.accent")`, `tone="warn"`), never raw values (`#d97706`).
+   Every component is rendered by the host's own renderer, and artifacts speak in semantic tokens (`tone="warn"`), never raw values (`#d97706`).
    The model composes from the standard vocabulary; it cannot ship a foreign look.
 
 7. **Every visual block carries `alt`.**
@@ -134,7 +134,7 @@ Two rules keep one artifact working everywhere: an unsupported rich component re
 
 ## Delivery: how an artifact reaches an app
 
-The core is transport-independent - `render(source)` needs no MCP.
+The core is transport-independent - rendering an artifact with `<Mosaic>` needs no MCP.
 For interop, an artifact-producing MCP tool returns the **IR** as an embedded resource:
 
 - **Mosaic-aware host.** The tool returns `mimeType: application/vnd.mosaic+json`; the host renders the IR through its own framework and its own components - no iframe. This mirrors how a native host (e.g. an ACP-based coding app) renders a typed plan today.
@@ -151,7 +151,7 @@ The one exception is `<Embed src="...">`, an explicit arbitrary-iframe escape ha
 
 ## Where decisions are still open
 
-- The real-world **subset-leakage** rate (a model emitting `{eggs*2}`, `.map`, or `className`) is unmeasured; close it mechanically (CFG-constrained decoding + the compile-time validator) and measure it. **(open)**
+- The real-world **subset-leakage** rate (a model emitting `className`, unknown function calls, or stateful expressions) is unmeasured; close it mechanically (CFG-constrained decoding + the compile-time validator) and measure it. **(open)**
 - The exact `expr` function catalog and where the static cost bound sits. **(open)**
 - Whether host macros want a shared registry format or stay fully host-private. **(open)**
 - Whether the streaming compiler needs a chunked envelope for very large artifacts. **(open)**

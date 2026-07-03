@@ -8,15 +8,16 @@ import {
   type PropValue,
   TEXT_TYPE,
   isExprRef,
-  isTokenRef,
   textNode,
 } from './ast.js';
+import { defaultBlock } from './blocks.js';
 import { type ExprValue, displayValue, evalExpr } from './expr.js';
 import type { HostManifest } from './manifest.js';
-import { blockSpec } from './registry.js';
 import { hasStatePath, parseStatePath, readStatePath, resolveStatePath } from './state-path.js';
 import { parseForEach } from './validate.js';
 
+/** The mutable artifact state: a flat map from path root identifiers to their
+ *  current values. resolve reads it; writeStatePath produces a new copy. */
 export type StateScope = Record<string, ExprValue>;
 
 /** The initial state an artifact declares: the root's `state={{…}}` prop. */
@@ -30,7 +31,6 @@ export function initialState(doc: MosaicDocument): StateScope {
 
 function resolveValue(value: PropValue, scope: StateScope): PropValue {
   if (isExprRef(value)) return (evalExpr(value.$expr, scope) ?? null) as PropValue;
-  if (isTokenRef(value)) return value; // tokens are the renderer's to map
   if (Array.isArray(value)) return value.map((v) => resolveValue(v, scope));
   if (value !== null && typeof value === 'object') {
     const out: Record<string, PropValue> = {};
@@ -142,8 +142,7 @@ function resolveNode(node: MosaicNode, scope: StateScope, interactive: boolean):
 }
 
 /** Resolve a document against a state scope: evaluate derived expressions,
- *  apply if:show, expand for:each, and fill control values. Tokens stay as
- *  refs - mapping them to a design is the renderer's job. */
+ *  apply if:show, expand for:each, and fill control values. */
 export function resolve(
   doc: MosaicDocument,
   manifest: HostManifest,
@@ -155,8 +154,6 @@ export function resolve(
   };
   return { ...doc, root };
 }
-
-// --- walk: the portable renderer contract ------------------------------------
 
 export type NodeVisitor<T> = {
   primitive(type: string, props: Record<string, PropValue>, children: T[], node: MosaicNode): T;
@@ -170,16 +167,16 @@ function walkNode<T>(node: MosaicNode, visitor: NodeVisitor<T>, manifest: HostMa
       typeof value === 'string' ? value : displayValue((value ?? '') as JsonLiteral),
     );
   }
-  const spec = blockSpec(node.type);
-  if (spec?.rich && spec.decomposeTo && !manifest.components_supported.includes(node.type)) {
-    return walkNode(spec.decomposeTo(node), visitor, manifest);
+  const def = defaultBlock(node.type);
+  if (def?.rich && def.decompose && !manifest.components_supported.includes(node.type)) {
+    return walkNode(def.decompose(node), visitor, manifest);
   }
   const children = (node.children ?? []).map((c) => walkNode(c, visitor, manifest));
   return visitor.primitive(node.type, node.props ?? {}, children, node);
 }
 
-/** Map each resolved node to one host-native surface. Rich components are
- *  expanded via decomposeTo before the visitor sees them. */
+/** Map each resolved node to one host-native surface. Rich built-ins are
+ *  expanded via their decompose recipe before the visitor sees them. */
 export function walk<T>(doc: MosaicDocument, visitor: NodeVisitor<T>, manifest: HostManifest): T {
   return walkNode(doc.root, visitor, manifest);
 }

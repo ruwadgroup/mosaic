@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     // Tests run against source; the published exports point at dist/.
     alias: {
-      '@mosaic/core': fileURLToPath(
+      '@mosaicjs/core': fileURLToPath(
         new URL('./packages/ts/mosaic-core/src/index.ts', import.meta.url),
       ),
     },

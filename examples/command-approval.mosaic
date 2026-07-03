@@ -1,11 +1,11 @@
 ```mosaic v=1 id=command-approval
-<Stack gap="4" state={{ scope: "Just once" }}>
+<Stack state={{ scope: "Just once" }}>
   {/* The permission-prompt artifact: instead of a yes/no modal, the agent lays
       out exactly what the command touches and lets you pick an approval scope.
       The Allow button label and intent args derive from the same radio state,
       so the approval that reaches the host is data, not a click. */}
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Heading level={2}>Approval needed</Heading>
     <Badge tone="warn">writes to your database</Badge>
   </Stack>
@@ -30,19 +30,19 @@
   </Callout>
 
   <Field label="Approval scope">
-    <Radio bind:state="scope" options={["Just once", "This session", "Always for this command"]} />
+    <Radio value={scope} options={["Just once", "This session", "Always for this command"]} />
   </Field>
 
-  <Stack direction="horizontal" gap="2">
+  <Stack direction="horizontal">
     <Button
-      tone="primary"
-      on:event={{ click: { action: "approveCommand", args: {
+      variant="primary"
+      onClick={approveCommand({
         command: "pnpm drizzle-kit migrate",
-        scope: expr("scope")
-      } } }}>
-      {expr("scope == 'Just once' ? 'Allow once' : scope == 'This session' ? 'Allow for this session' : 'Always allow this command'")}
+        scope: scope
+      })}>
+      {scope == 'Just once' ? 'Allow once' : scope == 'This session' ? 'Allow for this session' : 'Always allow this command'}
     </Button>
-    <Button on:event={{ click: { action: "denyCommand", args: { command: "pnpm drizzle-kit migrate" } } }}>
+    <Button onClick={denyCommand({ command: "pnpm drizzle-kit migrate" })}>
       Deny
     </Button>
   </Stack>

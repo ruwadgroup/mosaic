@@ -2,9 +2,14 @@
   "extends": "./tsconfig.base.json",
   "include": [],
   "references": [
-    { "path": "./packages/ts/mosaic-core" },
-    { "path": "./packages/ts/mosaic-react" },
-    { "path": "./packages/ts/mosaic-mcp" },
-    { "path": "./packages/ts/mosaic-ansi" }
+    {
+      "path": "./packages/ts/mosaic-core"
+    },
+    {
+      "path": "./packages/ts/mosaic-react"
+    },
+    {
+      "path": "./packages/ts/mosaic-ansi"
+    }
   ]
 }

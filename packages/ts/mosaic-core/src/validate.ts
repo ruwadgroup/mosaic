@@ -1,4 +1,6 @@
-// validate: the registry × manifest check (docs/proposal.md §3.2).
+// validate: the registry × manifest check (docs/proposal.md §3.2). The
+// algorithm takes the registry explicitly (validateDocument); the public
+// default-registry wrapper lives in index.ts so this module stays cycle-free.
 
 import {
   DIRECTIVE_NAMES,
@@ -10,9 +12,12 @@ import {
 } from './ast.js';
 import { parseExpr } from './expr.js';
 import type { HostManifest } from './manifest.js';
-import { blockSpec } from './registry.js';
+import type { MosaicRegistry } from './registry.js';
+import type { BlockDefinition, PropSpec } from './schema.js';
 import { parseStatePath } from './state-path.js';
 
+/** One validation finding: the IR path, the node type, a machine-readable code,
+ *  an optional fix hint for the model, and an optional prop name. */
 export type ValidationDiagnostic = {
   path: string;
   type: string;
@@ -20,6 +25,7 @@ export type ValidationDiagnostic = {
     | 'UNKNOWN_TAG'
     | 'MISSING_REQUIRED_PROP'
     | 'INVALID_PROP_VALUE'
+    | 'REMOVED_PROP'
     | 'INVALID_DIRECTIVE'
     | 'INVALID_EXPR'
     | 'INVALID_STATE_PATH'
@@ -29,6 +35,8 @@ export type ValidationDiagnostic = {
   prop?: string;
 };
 
+/** The result of a validation run: either success with advisory warnings,
+ *  or failure with a non-empty errors list. */
 export type ValidationResult =
   | { ok: true; doc: MosaicDocument; warnings: ValidationDiagnostic[] }
   | { ok: false; errors: ValidationDiagnostic[] };
@@ -160,6 +168,132 @@ function checkDiagram(node: MosaicNode, path: string, errors: ValidationDiagnost
   });
 }
 
+/** Shape-check one prop value against its schema. `expr(...)` resolves to a
+ *  value at render, so an ExprRef is accepted wherever a scalar is expected and
+ *  never rejected here. Unknown props (not in the schema) are left alone - a
+ *  host may read extras. */
+function checkValueShape(
+  value: PropValue,
+  spec: PropSpec,
+  path: string,
+  type: string,
+  prop: string,
+  errors: ValidationDiagnostic[],
+): void {
+  if (isExprRef(value)) return;
+  const fail = (fix: string) => errors.push({ path, type, code: 'INVALID_PROP_VALUE', prop, fix });
+  const isObj = (v: PropValue): v is Record<string, PropValue> =>
+    v !== null && typeof v === 'object' && !Array.isArray(v) && !isExprRef(v);
+
+  switch (spec.type) {
+    case 'string':
+      if (typeof value !== 'string' && typeof value !== 'number') fail('expected a string');
+      break;
+    case 'number':
+      if (typeof value !== 'number') fail('expected a number');
+      break;
+    case 'boolean':
+      if (typeof value !== 'boolean') fail('expected true or false');
+      break;
+    case 'enum':
+      if (typeof value !== 'string' || !(spec.values ?? []).includes(value)) {
+        fail(`expected one of: ${(spec.values ?? []).join(', ')}`);
+      }
+      break;
+    case 'string[]':
+    case 'number[]':
+      if (!Array.isArray(value)) fail(`expected an array (${spec.type})`);
+      break;
+    case 'string[][]':
+      if (!Array.isArray(value)) {
+        fail('expected an array of rows');
+      } else {
+        value.forEach((row, i) => {
+          if (!Array.isArray(row) && !isExprRef(row)) {
+            fail(
+              `[${i}] must be an array of cells (a string[]), not ${isObj(row) ? 'an object' : typeof row}`,
+            );
+          }
+        });
+      }
+      break;
+    case 'record[]':
+      if (!Array.isArray(value)) {
+        fail('expected an array of objects');
+      } else if (spec.shape) {
+        value.forEach((el, i) => {
+          if (isExprRef(el)) return;
+          if (!isObj(el)) {
+            fail(`[${i}] must be an object`);
+            return;
+          }
+          const obj = el as Record<string, PropValue>;
+          for (const [k, ks] of Object.entries(spec.shape ?? {})) {
+            if (ks.required && (obj[k] === undefined || obj[k] === null)) {
+              fail(`[${i}] missing required "${k}"`);
+            }
+          }
+        });
+      }
+      break;
+    case 'record':
+      if (!isObj(value)) fail('expected an object');
+      break;
+    default:
+      break;
+  }
+}
+
+/** Presentation props outside the semantic line (docs/proposal.md §A): the
+ *  format carries meaning and structure; the host owns spacing, typography,
+ *  and chrome. Keyed "Type.prop", with "*" matching any block; the fix names
+ *  the replacement so a model working from a stale schema self-corrects. */
+const REMOVED_PROPS: Readonly<Record<string, string>> = {
+  '*.gap': 'gap was removed in 0.7 - the host owns spacing; drop it',
+  '*.pad': 'pad was removed in 0.7 - the host owns spacing; drop it',
+  'Text.size':
+    'size was removed in 0.7 - use variant="label" (section micro-label) or variant="caption" (secondary text)',
+  'Text.weight': 'weight was removed in 0.7 - use Markdown for inline emphasis',
+  'Text.caps': 'caps was removed in 0.7 - use variant="label"',
+  'Icon.size': 'size was removed in 0.7 - the host sizes icons contextually',
+  'Button.size': 'size was removed in 0.7 - the host sizes controls',
+  'Stack.wrap': 'wrap was removed in 0.7 - the host owns overflow',
+  'Tabs.variant': 'variant was removed in 0.7 - the host owns tab chrome',
+};
+
+/** Check a node's literal props against its block definition: types, enum
+ *  values, array element shapes, required props, and removed-in-0.7 props. */
+function checkPropShapes(
+  node: MosaicNode,
+  def: BlockDefinition,
+  path: string,
+  errors: ValidationDiagnostic[],
+): void {
+  for (const [name, value] of Object.entries(node.props ?? {})) {
+    const spec = def.props[name];
+    if (spec !== undefined && value !== undefined) {
+      checkValueShape(value, spec, path, node.type, name, errors);
+    }
+    if (spec === undefined) {
+      const removed = REMOVED_PROPS[`${node.type}.${name}`] ?? REMOVED_PROPS[`*.${name}`];
+      if (removed) {
+        errors.push({ path, type: node.type, code: 'REMOVED_PROP', prop: name, fix: removed });
+      }
+    }
+  }
+  for (const [name, spec] of Object.entries(def.props)) {
+    if (spec.required && node.props?.[name] === undefined) {
+      errors.push({
+        path,
+        type: node.type,
+        code: 'MISSING_REQUIRED_PROP',
+        prop: name,
+        fix: name === 'alt' ? 'every visual block carries alt (invariant 7)' : undefined,
+      });
+    }
+  }
+}
+
 /** The for:each grammar: "EXPR as item", with an optional zero-based index
  *  binding "EXPR as item, i". */
 export function parseForEach(
@@ -177,6 +311,7 @@ function visit(
   node: MosaicNode,
   path: string,
   manifest: HostManifest,
+  registry: MosaicRegistry,
   errors: ValidationDiagnostic[],
   warnings: ValidationDiagnostic[],
 ): void {
@@ -186,37 +321,27 @@ function visit(
     return;
   }
 
-  const spec = blockSpec(node.type);
-  if (!spec) {
+  const def = registry.get(node.type);
+  if (!def) {
     const diag: ValidationDiagnostic = {
       path,
       type: node.type,
       code: 'UNKNOWN_TAG',
-      fix: 'not in the block registry; a host macro must expand before validation',
+      fix: 'not in the block registry; use a registered block or recompose from primitives',
     };
     if (manifest.strict) errors.push(diag);
     else warnings.push(diag);
   } else {
-    for (const required of spec.requiredProps ?? []) {
-      if (node.props?.[required] === undefined) {
-        errors.push({
-          path,
-          type: node.type,
-          code: 'MISSING_REQUIRED_PROP',
-          prop: required,
-          fix: required === 'alt' ? 'every visual block carries alt (invariant 7)' : undefined,
-        });
-      }
-    }
-    if (spec.rich && !manifest.components_supported.includes(node.type)) {
+    if (def.rich && !manifest.components_supported.includes(node.type)) {
       warnings.push({
         path,
         type: node.type,
         code: 'UNSUPPORTED_BY_HOST',
-        fix: 'renders through its decomposeTo expansion',
+        fix: 'renders through its decompose expansion',
       });
     }
     if (node.type === 'Diagram') checkDiagram(node, path, errors);
+    checkPropShapes(node, def, path, errors);
   }
 
   for (const [name, value] of Object.entries(node.props ?? {})) {
@@ -253,7 +378,22 @@ function visit(
     } else if (name === 'on:event' && value !== null && typeof value === 'object') {
       for (const action of Object.values(value as Record<string, PropValue>)) {
         if (action !== null && typeof action === 'object' && !Array.isArray(action)) {
-          const args = (action as { args?: Record<string, PropValue> }).args ?? {};
+          const named = action as { action?: string; args?: Record<string, PropValue> };
+          const args = named.args ?? {};
+          if (named.action === 'state.set' || named.action === 'state.toggle') {
+            const target = args.path;
+            if (typeof target === 'string') {
+              checkStatePathSource(target, path, node.type, name, errors);
+            } else {
+              errors.push({
+                path,
+                type: node.type,
+                code: 'INVALID_DIRECTIVE',
+                prop: name,
+                fix: `${named.action} needs a string args.path`,
+              });
+            }
+          }
           for (const [argName, argValue] of Object.entries(args)) {
             checkPropExprs(argValue, path, node.type, `on:event.${argName}`, errors);
           }
@@ -263,20 +403,25 @@ function visit(
   }
 
   node.children?.forEach((child, i) => {
-    visit(child, `${path}.${i}`, manifest, errors, warnings);
+    visit(child, `${path}.${i}`, manifest, registry, errors, warnings);
   });
   for (const [slot, nodes] of Object.entries(node.slots ?? {})) {
     nodes.forEach((child, i) => {
-      visit(child, `${path}.slots.${slot}.${i}`, manifest, errors, warnings);
+      visit(child, `${path}.slots.${slot}.${i}`, manifest, registry, errors, warnings);
     });
   }
 }
 
-/** Validate a document against the block registry and the host manifest. */
-export function validate(doc: MosaicDocument, manifest: HostManifest): ValidationResult {
+/** Validate a document against a block registry and a host manifest. The
+ *  public wrapper in index.ts defaults the registry to DEFAULT_REGISTRY. */
+export function validateDocument(
+  doc: MosaicDocument,
+  manifest: HostManifest,
+  registry: MosaicRegistry,
+): ValidationResult {
   const errors: ValidationDiagnostic[] = [];
   const warnings: ValidationDiagnostic[] = [];
-  visit(doc.root, 'root', manifest, errors, warnings);
+  visit(doc.root, 'root', manifest, registry, errors, warnings);
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, doc, warnings };
 }
