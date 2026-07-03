@@ -1,13 +1,15 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_THEME,
+  type ExprValue,
   MOSAIC_MEDIA_TYPE,
   MOSAIC_VERSION,
   type MosaicNode,
   type NodeVisitor,
+  blockSpec,
   compactManifest,
   evalExpr,
   exprDependencies,
@@ -15,11 +17,15 @@ import {
   loadMosaic,
   parse,
   parseFence,
+  parseStatePath,
+  readStatePath,
   resolve,
+  resolveStatePath,
   resolveToken,
   serialize,
   validate,
   walk,
+  writeStatePath,
 } from '../src/index.js';
 
 const EXAMPLES_DIR = join(import.meta.dirname, '../../../../examples');
@@ -163,6 +169,77 @@ describe('expr', () => {
   });
 });
 
+describe('state paths', () => {
+  it('parses flat keys, member chains, and computed indices', () => {
+    expect(parseStatePath('eggs')).toEqual({ root: 'eggs', segments: [] });
+    expect(parseStatePath('data.view').segments).toHaveLength(1);
+    expect(parseStatePath('files[i + 1].checked').segments).toHaveLength(2);
+  });
+
+  it('rejects anything that is not an ident/member/index chain', () => {
+    for (const src of [
+      'files.map(f)', // method call
+      '"files"[0]', // leading literal
+      'a + b', // arithmetic outside [...]
+      'files[0] + 1',
+      '[1, 2][0]',
+      'sum(files)',
+      '!flag',
+    ]) {
+      expect(() => parseStatePath(src), src).toThrow();
+    }
+  });
+
+  it('resolves [index] expressions against the scope to a concrete path', () => {
+    const path = parseStatePath('files[i].checked');
+    expect(resolveStatePath(path, { i: 2 })).toBe('files[2].checked');
+    expect(resolveStatePath(parseStatePath('eggs'), {})).toBe('eggs');
+    expect(resolveStatePath(parseStatePath('data[key]'), { key: 'view' })).toBe('data["view"]');
+    expect(() => resolveStatePath(path, {})).toThrow(/integer or a string/);
+  });
+
+  it('reads like expr member/index evaluation: missing segments yield null', () => {
+    const scope = { files: [{ checked: true }], data: { view: 'grid' } };
+    expect(readStatePath(scope, 'files[0].checked')).toBe(true);
+    expect(readStatePath(scope, 'data.view')).toBe('grid');
+    expect(readStatePath(scope, 'data.missing')).toBe(null);
+    expect(readStatePath(scope, 'files[9].checked')).toBe(null);
+  });
+
+  it('writes copy-on-write: path containers are cloned, siblings keep identity', () => {
+    const scope = {
+      files: [{ checked: true }, { checked: false }],
+      data: { view: 'grid' },
+    };
+    const next = writeStatePath(scope, 'files[1].checked', true);
+    expect(next).not.toBe(scope);
+    const files = next.files as Array<Record<string, ExprValue>>;
+    expect(files).not.toBe(scope.files);
+    expect(files[1]).not.toBe(scope.files[1]);
+    expect(files[1]?.checked).toBe(true);
+    expect(files[0]).toBe(scope.files[0]); // untouched sibling
+    expect(next.data).toBe(scope.data); // untouched branch
+    expect(scope.files[1]?.checked).toBe(false); // the original never mutates
+  });
+
+  it('flat keys stay the trivial path: root writes create keys like before', () => {
+    expect(writeStatePath({}, 'eggs', 80)).toEqual({ eggs: 80 });
+  });
+
+  it('a write through a missing or mismatched container warns and is a no-op', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const scope = { files: [{ checked: true }] };
+      expect(writeStatePath(scope, 'nope[0].checked', true)).toBe(scope);
+      expect(writeStatePath(scope, 'files[9].checked', true)).toBe(scope); // out of range
+      expect(writeStatePath(scope, 'files.checked', true)).toBe(scope); // string key into an array
+      expect(warn).toHaveBeenCalledTimes(3);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
 describe('validate / resolve / walk', () => {
   it('requires alt on visual blocks (invariant 7)', () => {
     const doc = loadMosaic('<Chart type="bar" series={[]} />');
@@ -227,10 +304,88 @@ describe('validate / resolve / walk', () => {
     expect(resolved.root.children).toHaveLength(2);
   });
 
+  it('for:each binds the optional zero-based index: "rows as row, i"', () => {
+    const doc = loadMosaic(`
+      <Stack state={{ rows: [{ name: "a" }, { name: "b" }] }}>
+        <Text for:each="rows as row, i">{expr("concat(i, ':', row.name)")}</Text>
+      </Stack>`);
+    expect(validate(doc, DEFAULT_MANIFEST).ok).toBe(true);
+    const texts: string[] = [];
+    const visitor: NodeVisitor<null> = {
+      primitive: () => null,
+      text: (v) => {
+        texts.push(v);
+        return null;
+      },
+    };
+    walk(resolve(doc, DEFAULT_MANIFEST), visitor, DEFAULT_MANIFEST);
+    expect(texts).toEqual(['0:a', '1:b']);
+  });
+
+  it('resolve rewrites bind:state to the concrete path; the stored IR keeps the authored one', () => {
+    const doc = loadMosaic(`
+      <Stack state={{ files: [{ checked: true }, { checked: false }, { checked: true }] }}>
+        <Checkbox for:each="files as f, i" bind:state="files[i].checked" label={expr("f.path")} />
+      </Stack>`);
+    expect(validate(doc, DEFAULT_MANIFEST).ok).toBe(true);
+    const resolved = resolve(doc, DEFAULT_MANIFEST);
+    expect(resolved.root.children).toHaveLength(3);
+    const third = resolved.root.children?.[2];
+    expect(third?.directives?.['bind:state']).toBe('files[2].checked');
+    expect(third?.props?.value).toBe(true);
+    expect(resolved.root.children?.[1]?.props?.value).toBe(false);
+    expect(doc.root.children?.[0]?.directives?.['bind:state']).toBe('files[i].checked');
+  });
+
+  it('from:state follows record paths', () => {
+    const doc = loadMosaic(`
+      <Stack state={{ data: { view: "grid" } }}>
+        <Input label="View" from:state="data.view" />
+      </Stack>`);
+    const resolved = resolve(doc, DEFAULT_MANIFEST);
+    expect(resolved.root.children?.[0]?.props?.value).toBe('grid');
+  });
+
+  it('flags bind:state / from:state strings that are not paths', () => {
+    for (const src of [
+      '<Slider label="x" bind:state="files.map(f)" min={0} max={1} />',
+      '<Input label="x" from:state="1 + count" />',
+    ]) {
+      const result = validate(loadMosaic(src), DEFAULT_MANIFEST);
+      expect(result.ok, src).toBe(false);
+      if (result.ok) continue;
+      expect(
+        result.errors.some((e) => e.code === 'INVALID_STATE_PATH'),
+        src,
+      ).toBe(true);
+    }
+  });
+
   it('a non-interactive host renders default states', () => {
     const doc = loadMosaic('<Stack state={{ on: false }}><Text if:show="on">secret</Text></Stack>');
     const still = resolve(doc, { ...DEFAULT_MANIFEST, interactive: false });
     expect(still.root.children).toHaveLength(1); // if:show ignored, default state kept
+  });
+
+  it('Timeline decomposes to "date - title - description"; tone stays visual-only', () => {
+    const doc = loadMosaic(`
+      <Timeline items={[
+        { date: "May 3", title: "Incident opened", description: "Elevated 5xx from the queue", tone: "warn" },
+        { date: "May 4", title: "Resolved" },
+      ]} />`);
+    const bare = { ...DEFAULT_MANIFEST, components_supported: [] };
+    const out = walk(
+      doc,
+      {
+        primitive: (_type, _props, children) => children.join('\n'),
+        text: (v) => v,
+      },
+      bare,
+    );
+    expect(out).toContain('May 3 - Incident opened - Elevated 5xx from the queue');
+    expect(out).toContain('May 4 - Resolved');
+    expect(out).not.toContain('warn');
+    expect(out).not.toContain('\u2014'); // the em dash is gone from the floor
   });
 
   it('rich components decompose where unsupported (invariant 8)', () => {
@@ -245,6 +400,91 @@ describe('validate / resolve / walk', () => {
       bare,
     );
     expect(out).toContain('Done: 3 / 6');
+  });
+});
+
+describe('the Diagram block', () => {
+  const diagram = (props: string) =>
+    loadMosaic(`<Diagram alt="From monolith to services" ${props} />`);
+
+  it('a well-formed diagram validates: groups, group refs, group-to-group edges', () => {
+    const doc = diagram(`
+      nodes={[
+        { id: "client", label: "Client", kind: "client" },
+        { id: "monolith", label: "Monolith", kind: "service", group: "before" },
+        { id: "api", label: "API", kind: "service", group: "after" },
+      ]}
+      groups={[{ id: "before", label: "Before" }, { id: "after", label: "After" }]}
+      edges={[{ from: "client", to: "monolith" }, { from: "before", to: "after", label: "extract" }]}`);
+    const result = validate(doc, DEFAULT_MANIFEST);
+    expect(result.ok, JSON.stringify(result, null, 2)).toBe(true);
+  });
+
+  it('flags duplicate ids, dangling edge endpoints, and unknown group refs', () => {
+    for (const props of [
+      // duplicate id across nodes
+      'nodes={[{ id: "a", label: "A" }, { id: "a", label: "Again" }]} edges={[]}',
+      // duplicate id across nodes and groups
+      'nodes={[{ id: "a", label: "A" }]} groups={[{ id: "a", label: "Group A" }]} edges={[]}',
+      // edge endpoint that is neither a node nor a group
+      'nodes={[{ id: "a", label: "A" }]} edges={[{ from: "a", to: "ghost" }]}',
+      // node referencing an undeclared group
+      'nodes={[{ id: "a", label: "A", group: "ghost" }]} edges={[]}',
+    ]) {
+      const result = validate(diagram(props), DEFAULT_MANIFEST);
+      expect(result.ok, props).toBe(false);
+      if (result.ok) continue;
+      expect(
+        result.errors.some((e) => e.code === 'INVALID_DIAGRAM'),
+        props,
+      ).toBe(true);
+    }
+  });
+
+  it('malformed shapes are diagnostics, not crashes', () => {
+    for (const props of [
+      'nodes="not an array" edges={[]}',
+      'nodes={[{ label: "no id" }]} edges={[]}',
+      'nodes={[{ id: "a", label: "A" }]} edges={["a -> b"]}',
+    ]) {
+      const result = validate(diagram(props), DEFAULT_MANIFEST);
+      expect(result.ok, props).toBe(false);
+      if (result.ok) continue;
+      expect(
+        result.errors.some((e) => e.code === 'INVALID_DIAGRAM'),
+        props,
+      ).toBe(true);
+    }
+  });
+
+  it('decomposes to alt, group headings, node lines, and ASCII edge lines', () => {
+    const doc = diagram(`
+      nodes={[
+        { id: "client", label: "Client", kind: "client" },
+        { id: "monolith", label: "Monolith", kind: "service", group: "before" },
+        { id: "api", label: "API", kind: "service", group: "after" },
+        { id: "worker", label: "Worker", kind: "service", group: "after" },
+      ]}
+      groups={[{ id: "before", label: "Before" }, { id: "after", label: "After" }]}
+      edges={[{ from: "before", to: "after", label: "extract" }, { from: "client", to: "monolith" }]}`);
+    const stack = blockSpec('Diagram')?.decomposeTo?.(doc.root);
+    expect(stack?.type).toBe('Stack');
+    const lines = (stack?.children ?? []).map((child) => ({
+      bold: child.props?.weight === 'bold',
+      text: child.children?.[0]?.props?.value,
+    }));
+    expect(lines).toEqual([
+      { bold: true, text: 'From monolith to services' },
+      { bold: true, text: 'Before' },
+      { bold: false, text: '- Monolith (service)' },
+      { bold: true, text: 'After' },
+      { bold: false, text: '- API (service)' },
+      { bold: false, text: '- Worker (service)' },
+      { bold: true, text: 'Nodes' },
+      { bold: false, text: '- Client (client)' },
+      { bold: false, text: 'Before -> After - extract' },
+      { bold: false, text: 'Client -> Monolith' },
+    ]);
   });
 });
 

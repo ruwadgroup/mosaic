@@ -1,4 +1,4 @@
-// @mosaic/core — the framework-agnostic heart of Mosaic.
+// @mosaic/core - the framework-agnostic heart of Mosaic.
 //
 // The Mosaic compiler (mosaic-jsx -> IR), the IR types, validate, resolve, the
 // expr evaluator, walk(), the block registry, and the Host Manifest.
@@ -56,6 +56,14 @@ export type { ValidationDiagnostic, ValidationResult } from './validate.js';
 
 export { initialState, resolve, walk } from './resolve.js';
 export type { NodeVisitor, StateScope } from './resolve.js';
+
+export {
+  parseStatePath,
+  readStatePath,
+  resolveStatePath,
+  writeStatePath,
+} from './state-path.js';
+export type { StatePath, StatePathSegment } from './state-path.js';
 
 export {
   DEFAULT_MANIFEST,

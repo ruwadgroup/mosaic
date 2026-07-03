@@ -1,4 +1,4 @@
-// expr — the bounded, CEL-class expression language (docs/proposal.md §6.2).
+// expr - the bounded, CEL-class expression language (docs/proposal.md §6.2).
 //
 // AST-interpreted, never eval'd. Non-Turing-complete by construction: no
 // assignment, no user functions, no recursion, no loops, no I/O. A static
@@ -357,7 +357,7 @@ class Parser {
       // First argument is always an ordinary expression (the array for folds).
       args.push(this.ternary());
       if (isLambdaFn) {
-        // fold form: fn(arr, item, body) — reduce adds an accumulator:
+        // fold form: fn(arr, item, body) - reduce adds an accumulator:
         // reduce(arr, item, acc, body, init)
         this.expectOp(',');
         const param = this.next();
@@ -407,7 +407,7 @@ function compile(source: string): Ast {
   return ast;
 }
 
-/** The root identifiers an expression reads — its dependency set. */
+/** The root identifiers an expression reads - its dependency set. */
 export function exprDependencies(source: string): string[] {
   const deps = new Set<string>();
   const visit = (ast: Ast, bound: Set<string>): void => {
@@ -762,6 +762,24 @@ function cmp(a: ExprValue, b: ExprValue): number {
  *  eval'd; non-Turing-complete, terminating, side-effect-free. */
 export function evalExpr(source: string, scope: Record<string, ExprValue>): ExprValue {
   return new Interpreter().eval(compile(source), scope);
+}
+
+// --- state-path plumbing ----------------------------------------------------
+//
+// Internal surface for state-path.ts: a state path is a shape-restricted expr
+// AST, and its [index] sub-expressions evaluate with the same interpreter.
+// Not re-exported from the package index.
+
+export type { Ast as ExprAst };
+
+/** Parse an expression to its raw AST (cached). Internal. */
+export function exprAst(source: string): Ast {
+  return compile(source);
+}
+
+/** Evaluate a sub-AST against a scope. Internal. */
+export function evalExprAst(ast: Ast, scope: Record<string, ExprValue>): ExprValue {
+  return new Interpreter().eval(ast, scope);
 }
 
 /** Format an expr result for text display. */

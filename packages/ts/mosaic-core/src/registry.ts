@@ -1,4 +1,4 @@
-// The block registry: the §4.1 catalog. General building blocks only — no
+// The block registry: the §4.1 catalog. General building blocks only, no
 // domain templates. Rich components carry a decomposeTo recipe so a renderer
 // that cannot draw them renders the primitive expansion instead (invariant 8).
 
@@ -48,6 +48,56 @@ function tableFallback(node: MosaicNode): MosaicNode {
         children: [textNode(row.map((c) => (typeof c === 'object' ? '' : String(c))).join(' | '))],
       });
     }
+  }
+  return { type: 'Stack', props: { gap: '1' }, children };
+}
+
+function records(v: PropValue | undefined): Array<Record<string, PropValue>> {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (item): item is Record<string, PropValue> =>
+      item !== null && typeof item === 'object' && !Array.isArray(item),
+  );
+}
+
+/** Alt, grouped node lines, then one "a -> b" line per edge (the Diagram floor). */
+function diagramFallback(node: MosaicNode): MosaicNode {
+  const nodes = records(prop(node, 'nodes'));
+  const groups = records(prop(node, 'groups'));
+  const edges = records(prop(node, 'edges'));
+
+  const labelOf = new Map<PropValue | undefined, string>();
+  for (const g of groups) labelOf.set(g.id, asString(g.label, asString(g.id)));
+  for (const n of nodes) labelOf.set(n.id, asString(n.label, asString(n.id)));
+
+  const heading = (text: string): MosaicNode => ({
+    type: 'Text',
+    props: { weight: 'bold' },
+    children: [textNode(text)],
+  });
+  const line = (text: string): MosaicNode => ({ type: 'Text', children: [textNode(text)] });
+  const nodeLine = (n: Record<string, PropValue>): MosaicNode => {
+    const label = asString(n.label, asString(n.id));
+    const kind = asString(n.kind);
+    return line(kind ? `- ${label} (${kind})` : `- ${label}`);
+  };
+
+  const children: MosaicNode[] = [heading(asString(prop(node, 'alt'), '[diagram]'))];
+  for (const g of groups) {
+    children.push(heading(asString(g.label, asString(g.id))));
+    for (const n of nodes) if (n.group === g.id) children.push(nodeLine(n));
+  }
+  const groupIds = new Set<PropValue | undefined>(groups.map((g) => g.id));
+  const ungrouped = nodes.filter((n) => !groupIds.has(n.group));
+  if (ungrouped.length > 0) {
+    if (groups.length > 0) children.push(heading('Nodes'));
+    for (const n of ungrouped) children.push(nodeLine(n));
+  }
+  for (const e of edges) {
+    const from = labelOf.get(e.from) ?? asString(e.from);
+    const to = labelOf.get(e.to) ?? asString(e.to);
+    const label = asString(e.label);
+    children.push(line(label ? `${from} -> ${to} - ${label}` : `${from} -> ${to}`));
   }
   return { type: 'Stack', props: { gap: '1' }, children };
 }
@@ -147,13 +197,17 @@ export const BLOCK_REGISTRY: Readonly<Record<string, BlockSpec>> = {
     kind: 'data',
     rich: true,
     decomposeTo: (node) =>
-      itemsFallback(node, (i) => `${asString(i.date)} — ${asString(i.title)}`.trim()),
+      itemsFallback(node, (i) => {
+        const head = `${asString(i.date)} - ${asString(i.title)}`.trim();
+        const description = asString(i.description);
+        return description ? `${head} - ${description}` : head;
+      }),
   },
   Calendar: {
     kind: 'data',
     rich: true,
     decomposeTo: (node) =>
-      itemsFallback(node, (i) => `${asString(i.date)} — ${asString(i.title)}`.trim()),
+      itemsFallback(node, (i) => `${asString(i.date)} - ${asString(i.title)}`.trim()),
   },
   Stat: {
     kind: 'data',
@@ -176,6 +230,12 @@ export const BLOCK_REGISTRY: Readonly<Record<string, BlockSpec>> = {
     rich: true,
     requiredProps: ['alt'],
     decomposeTo: (n) => altFallback(n, 'chart'),
+  },
+  Diagram: {
+    kind: 'data',
+    rich: true,
+    requiredProps: ['alt'],
+    decomposeTo: diagramFallback,
   },
   Canvas: {
     kind: 'data',

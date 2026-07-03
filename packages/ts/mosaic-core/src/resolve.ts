@@ -14,6 +14,7 @@ import {
 import { type ExprValue, displayValue, evalExpr } from './expr.js';
 import type { HostManifest } from './manifest.js';
 import { blockSpec } from './registry.js';
+import { hasStatePath, parseStatePath, readStatePath, resolveStatePath } from './state-path.js';
 import { parseForEach } from './validate.js';
 
 export type StateScope = Record<string, ExprValue>;
@@ -56,20 +57,37 @@ function resolveNode(node: MosaicNode, scope: StateScope, interactive: boolean):
   const props: Record<string, PropValue> = {};
   for (const [k, v] of Object.entries(node.props ?? {})) props[k] = resolveValue(v, scope);
 
-  if (typeof directives['from:state'] === 'string') {
-    props.value = (scope[directives['from:state']] ?? null) as PropValue;
+  // bind:state / from:state accept record paths ("files[i].checked"): the
+  // [index] expressions resolve against the current scope here, and the
+  // resolved node carries the concrete path so renderers close over it. The
+  // stored IR keeps the authored path (invariant 9).
+  const fromPath =
+    typeof directives['from:state'] === 'string'
+      ? resolveStatePath(parseStatePath(directives['from:state']), scope)
+      : undefined;
+  if (fromPath !== undefined) {
+    props.value = readStatePath(scope, fromPath) as PropValue;
   }
   if (interactive && typeof directives['from:expr'] === 'string') {
     props.value = (evalExpr(directives['from:expr'], scope) ?? null) as PropValue;
   }
-  if (typeof directives['bind:state'] === 'string') {
-    const bound = scope[directives['bind:state']];
-    if (bound !== undefined) props.value = bound as PropValue;
+  const bindPath =
+    typeof directives['bind:state'] === 'string'
+      ? resolveStatePath(parseStatePath(directives['bind:state']), scope)
+      : undefined;
+  if (bindPath !== undefined && hasStatePath(scope, bindPath)) {
+    props.value = readStatePath(scope, bindPath) as PropValue;
   }
 
   const out: MosaicNode = { ...node, props };
 
   let resolvedDirectives = directives;
+  if (fromPath !== undefined && fromPath !== directives['from:state']) {
+    resolvedDirectives = { ...resolvedDirectives, 'from:state': fromPath };
+  }
+  if (bindPath !== undefined && bindPath !== directives['bind:state']) {
+    resolvedDirectives = { ...resolvedDirectives, 'bind:state': bindPath };
+  }
   if (isExprRef(directives.key)) {
     resolvedDirectives = {
       ...resolvedDirectives,
@@ -102,8 +120,9 @@ function resolveNode(node: MosaicNode, scope: StateScope, interactive: boolean):
       if (parsed) {
         const items = evalExpr(parsed.expr, scope);
         if (Array.isArray(items)) {
-          for (const item of items) {
-            const itemScope = { ...scope, [parsed.binding]: item };
+          for (const [i, item] of items.entries()) {
+            const itemScope: StateScope = { ...scope, [parsed.binding]: item };
+            if (parsed.index !== undefined) itemScope[parsed.index] = i;
             const { 'for:each': _dropped, ...rest } = child.directives ?? {};
             const instance = resolveNode({ ...child, directives: rest }, itemScope, interactive);
             if (instance) children.push(instance);
@@ -124,7 +143,7 @@ function resolveNode(node: MosaicNode, scope: StateScope, interactive: boolean):
 
 /** Resolve a document against a state scope: evaluate derived expressions,
  *  apply if:show, expand for:each, and fill control values. Tokens stay as
- *  refs — mapping them to a design is the renderer's job. */
+ *  refs - mapping them to a design is the renderer's job. */
 export function resolve(
   doc: MosaicDocument,
   manifest: HostManifest,

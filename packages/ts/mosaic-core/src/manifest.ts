@@ -1,4 +1,4 @@
-// Host Manifest (docs/proposal.md §3.3) — capabilities and policy, never design.
+// Host Manifest (docs/proposal.md §3.3) - capabilities and policy, never design.
 // The host's renderer draws every component; token values never travel.
 
 export type GraphicsLevel = 'none' | 'static' | 'rich';
@@ -29,6 +29,7 @@ export const DEFAULT_MANIFEST: HostManifest = {
     'Calendar',
     'Stat',
     'Chart',
+    'Diagram',
   ],
   directives_supported: [
     'bind:state',

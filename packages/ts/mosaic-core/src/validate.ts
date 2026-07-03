@@ -11,6 +11,7 @@ import {
 import { parseExpr } from './expr.js';
 import type { HostManifest } from './manifest.js';
 import { blockSpec } from './registry.js';
+import { parseStatePath } from './state-path.js';
 
 export type ValidationDiagnostic = {
   path: string;
@@ -21,6 +22,8 @@ export type ValidationDiagnostic = {
     | 'INVALID_PROP_VALUE'
     | 'INVALID_DIRECTIVE'
     | 'INVALID_EXPR'
+    | 'INVALID_STATE_PATH'
+    | 'INVALID_DIAGRAM'
     | 'UNSUPPORTED_BY_HOST';
   fix?: string;
   prop?: string;
@@ -72,11 +75,102 @@ function checkPropExprs(
   }
 }
 
-/** The for:each grammar: "EXPR as name". */
-export function parseForEach(source: string): { expr: string; binding: string } | null {
-  const m = /^([\s\S]+)\s+as\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(source);
+function checkStatePathSource(
+  source: string,
+  path: string,
+  type: string,
+  prop: string,
+  errors: ValidationDiagnostic[],
+): void {
+  try {
+    parseStatePath(source);
+  } catch (e) {
+    errors.push({
+      path,
+      type,
+      code: 'INVALID_STATE_PATH',
+      prop,
+      fix: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
+
+/** Diagram structural checks (arch: ids unique across nodes and groups, edge
+ *  endpoints and node group refs must resolve). Expr-valued structure resolves
+ *  later, so literal shapes are all we can check here. */
+function checkDiagram(node: MosaicNode, path: string, errors: ValidationDiagnostic[]): void {
+  const push = (prop: string, fix: string) =>
+    errors.push({ path, type: node.type, code: 'INVALID_DIAGRAM', prop, fix });
+  const listOf = (prop: string): PropValue[] | null => {
+    const raw = node.props?.[prop];
+    if (raw === undefined || isExprRef(raw)) return raw === undefined ? [] : null;
+    if (!Array.isArray(raw)) {
+      push(prop, `${prop} must be an array`);
+      return null;
+    }
+    return raw;
+  };
+  const asRecord = (item: PropValue): Record<string, PropValue> | null =>
+    item !== null && typeof item === 'object' && !Array.isArray(item) && !isExprRef(item)
+      ? (item as Record<string, PropValue>)
+      : null;
+
+  const nodes = listOf('nodes');
+  const edges = listOf('edges');
+  const groups = listOf('groups');
+  if (nodes === null || edges === null || groups === null) return;
+
+  const ids = new Set<string>();
+  const groupIds = new Set<string>();
+  const collect = (items: PropValue[], prop: string, into?: Set<string>) => {
+    items.forEach((item, i) => {
+      const rec = asRecord(item);
+      if (!rec || typeof rec.id !== 'string' || typeof rec.label !== 'string') {
+        push(prop, `${prop}[${i}] must be a record with a string id and label`);
+        return;
+      }
+      if (ids.has(rec.id)) push(prop, `duplicate id "${rec.id}" across nodes and groups`);
+      ids.add(rec.id);
+      into?.add(rec.id);
+    });
+  };
+  collect(nodes, 'nodes');
+  collect(groups, 'groups', groupIds);
+
+  nodes.forEach((item, i) => {
+    const group = asRecord(item)?.group;
+    if (group === undefined || isExprRef(group)) return;
+    if (typeof group !== 'string' || !groupIds.has(group)) {
+      push('nodes', `nodes[${i}].group "${String(group)}" does not match any groups[].id`);
+    }
+  });
+  edges.forEach((item, i) => {
+    const rec = asRecord(item);
+    if (!rec) {
+      push('edges', `edges[${i}] must be a record with from and to ids`);
+      return;
+    }
+    for (const end of ['from', 'to'] as const) {
+      const id = rec[end];
+      if (isExprRef(id)) continue;
+      if (typeof id !== 'string' || !ids.has(id)) {
+        push('edges', `edges[${i}].${end} "${String(id)}" is neither a node nor a group id`);
+      }
+    }
+  });
+}
+
+/** The for:each grammar: "EXPR as item", with an optional zero-based index
+ *  binding "EXPR as item, i". */
+export function parseForEach(
+  source: string,
+): { expr: string; binding: string; index?: string } | null {
+  const m =
+    /^([\s\S]+)\s+as\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:,\s*([A-Za-z_][A-Za-z0-9_]*))?\s*$/.exec(
+      source,
+    );
   if (!m) return null;
-  return { expr: (m[1] as string).trim(), binding: m[2] as string };
+  return { expr: (m[1] as string).trim(), binding: m[2] as string, index: m[3] };
 }
 
 function visit(
@@ -122,6 +216,7 @@ function visit(
         fix: 'renders through its decomposeTo expansion',
       });
     }
+    if (node.type === 'Diagram') checkDiagram(node, path, errors);
   }
 
   for (const [name, value] of Object.entries(node.props ?? {})) {
@@ -134,7 +229,9 @@ function visit(
       errors.push({ path, type: node.type, code: 'INVALID_DIRECTIVE', prop: name });
       continue;
     }
-    if (name === 'if:show' || name === 'from:expr') {
+    if (name === 'bind:state' || name === 'from:state') {
+      if (typeof value === 'string') checkStatePathSource(value, path, node.type, name, errors);
+    } else if (name === 'if:show' || name === 'from:expr') {
       if (typeof value === 'string') checkExprSource(value, path, node.type, name, errors);
     } else if (name === 'for:each') {
       if (typeof value === 'string') {
@@ -145,7 +242,7 @@ function visit(
             type: node.type,
             code: 'INVALID_DIRECTIVE',
             prop: name,
-            fix: 'for:each takes "EXPR as name"',
+            fix: 'for:each takes "EXPR as item" or "EXPR as item, i"',
           });
         } else {
           checkExprSource(parsed.expr, path, node.type, name, errors);
