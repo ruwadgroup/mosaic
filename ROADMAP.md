@@ -68,12 +68,6 @@ Widen from primitives to the rich components.
 - [ ] The token-efficiency bake-off harness: re-emit Thariq Shihipar's HTML gallery as Mosaic and measure tokens, time-to-last-byte, and blind visual quality ([proposal §9](docs/proposal.md)).
 - [ ] The validator-to-model feedback loop, the system-prompt primer, and - where the host controls the decoder - CFG-constrained decoding of the Mosaic grammar, with a subset-leakage eval.
 
-## How this maps to specs
-
-Each stage is decomposed into specs under [`specs/`](specs/) using the `/spec` workflow.
-A spec must land and pass review before its implementation begins.
-See [`specs/README.md`](specs/README.md) for the full backlog and [`specs/conventions.md`](specs/conventions.md) for the house style.
-
 ## Non-goals (for now)
 
 - Being a Turing-complete artifact format. A live notebook, an in-artifact editor, or a game needs real code, and Mosaic refuses it (invariants 1-2). `<Embed>` is the escape hatch; MCP Apps already exists for that beast.

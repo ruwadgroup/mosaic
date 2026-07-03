@@ -6,7 +6,7 @@ This page is the practical reference for every block in the registry: what it is
 The normative prop schemas live in [`schema/primitives.schema.json`](../schema/primitives.schema.json).
 
 The catalog itself is a **proposal, not a wall**.
-This set is what we ship because it is efficient - general shapes a model emits cheaply, broad enough that common affordances need no hand-composition - but it is designed to be added to: a host extends it with [macros](proposal.md#44-host-macros) and its own components today, and the shared registry evolves through [specs](../specs/README.md).
+This set is what we ship because it is efficient - general shapes a model emits cheaply, broad enough that common affordances need no hand-composition - but it is designed to be added to: a host extends it with [macros](proposal.md#44-host-macros) and its own components today, and the shared registry evolves through the [design process](../.github/CONTRIBUTING.md#design-changes).
 What is fixed is the grammar and the invariants, not the block list.
 
 Conventions that hold across the catalog:
@@ -106,7 +106,7 @@ The Floor column names that expansion.
 
 ### `Diagram` in one example
 
-`Diagram` replaces hand-drawn SVG for the explainer genre - flows, funnels, layered maps ([spec 0304](../specs/0304-diagram-block.md)):
+`Diagram` replaces hand-drawn SVG for the explainer genre - flows, funnels, layered maps ([proposal §4.3](proposal.md#43-data--viz-components)):
 
 ```jsx
 <Diagram alt="Request path from client to database" bind:state="selected"

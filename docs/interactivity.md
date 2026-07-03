@@ -19,7 +19,7 @@ There is no dependency graph to manage and no partial invalidation to get wrong.
 
 ## State paths
 
-Anywhere Mosaic takes a state key it takes a **state path** ([spec 0104](../specs/0104-record-state-paths.md)):
+Anywhere Mosaic takes a state key it takes a **state path** ([proposal §6.1](proposal.md#61-state-derived-values-conditionals-lists)):
 
 ```ebnf
 path    = ident segment* ;
@@ -47,7 +47,7 @@ A path that is not `ident`/member/index-shaped (a call, arithmetic outside `[…
 | `on:event`    | `{ event: action }` map                 | Fires an action on an event - see [Events](#events)                    |
 | `key`         | string or `expr("…")`                   | Stable identity for list-child diffing                                 |
 
-Three more names - `theme:scope`, `slot:name`, `from:ref` - are reserved in the grammar for upcoming specs and carry no semantics yet; do not write them.
+Three more names - `theme:scope`, `slot:name`, `from:ref` - are reserved in the grammar for future capabilities and carry no semantics yet; do not write them.
 
 ### Binds
 

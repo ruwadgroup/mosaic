@@ -14,7 +14,7 @@ Thanks for considering it. This is a small project right now and the bar for con
 ## What kind of changes I'm looking for, in priority order
 
 1. **Bug reports against the spec.** If something in the proposal is wrong, contradictory, or under-specified, that's the most valuable thing you can tell me. Cite the section number.
-2. **Reference implementation work.** Start with `packages/ts/mosaic-core` (the parser, registry, and `expr` evaluator) — it's the load-bearing piece. The `mosaic-react` reference renderer is the next priority. See [ROADMAP.md](../ROADMAP.md) for the staged build order and [`specs/`](../specs/) for the per-capability specs.
+2. **Reference implementation work.** Start with `packages/ts/mosaic-core` (the parser, registry, and `expr` evaluator) — it's the load-bearing piece. The `mosaic-react` reference renderer is the next priority. See [ROADMAP.md](../ROADMAP.md) for the staged build order.
 3. **Bake-off contributions.** A reproducible head-to-head against Thariq Shihipar's HTML gallery is the empirical question that decides whether Mosaic ships. If you want to help build that harness, I want to talk.
 4. **Renderer ports.** A renderer for another stack - SwiftUI, Compose, Flutter, a TUI, email, Slack - written against the same AST, with `mosaic-react` as the worked example. Mosaic ships only the reference renderer; these live wherever their builder wants them.
 5. **Doc improvements.** Examples that clarify, FAQ entries that head off recurring questions, prose that's tighter than mine.
@@ -49,13 +49,13 @@ I follow Conventional Commits loosely. The TL;DR:
 
 Anything that changes Mosaic, the IR, or a public API in a package needs a changeset (`pnpm changeset`).
 
-## Spec process
+## Design changes
 
-The format is spec-first: any change to an [invariant](../ARCHITECTURE.md#invariants), the Mosaic grammar, the IR shape, the primitive or preset registry, or the security model starts as a written spec under [`specs/`](../specs/) — see [`specs/conventions.md`](../specs/conventions.md) for the house style. The [proposal](../docs/proposal.md) is re-cut only on a vision-level shift; features land as specs.
+Any change to an [invariant](../ARCHITECTURE.md#invariants), the Mosaic grammar, the IR shape, the block registry, or the security model starts as a written proposal in an issue — before code. The [proposal](../docs/proposal.md) is the definition of the format and is re-cut only on a vision-level shift.
 
-Once Mosaic has more than one implementation and a handful of users, such changes go through a numbered spec modeled on MCP's SEP process: a comment period, two implementations, and maintainer sign-off. See [§12 of the proposal](../docs/proposal.md#12-adoption) for the governance sketch.
+Once Mosaic has more than one implementation and a handful of users, such changes go through a numbered process modeled on MCP's SEP: a comment period, two implementations, and maintainer sign-off. See [§11 of the proposal](../docs/proposal.md#11-adoption) for the governance sketch.
 
-For now (pre-v1), I'm batching changes. If you're proposing something invasive, open an issue tagged `spec-proposal` and we can talk about scope.
+For now (pre-v1), I'm batching changes. If you're proposing something invasive, open an issue tagged `design-proposal` and we can talk about scope.
 
 ## A note on tone
 

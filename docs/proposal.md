@@ -12,9 +12,9 @@ anything, inside your app's look, with no code to run._
 > This document defines Mosaic: the JSX language, the IR it compiles to, the building-block
 > vocabulary, the reactive expression model, the Host Manifest, the renderer contract, the MCP
 > delivery model, the public API, and the security guarantees.
-> The [specs](../specs/README.md) cite this document by section number; the numbering is kept stable
+> The docs and the implementation cite this document by section number; the numbering is kept stable
 > so citations hold.
-> It is re-cut only on a vision-level shift; features land as specs.
+> It is re-cut only on a vision-level shift.
 > Staging lives in the [roadmap](../ROADMAP.md), not here: _order, not scope._
 
 ---
@@ -538,8 +538,7 @@ Flat tabular data is the exception, which is why tables and series ride in prop-
 
 The figures below use `o200k_base` as a tokenizer proxy and compare each interface with a
 hand-written HTML equivalent.
-They are **projections** until the bake-off harness ([spec 0901](../specs/README.md)) measures them
-against a real HTML gallery.
+They are **projections** until a bake-off harness measures them against a real HTML gallery.
 
 | Interface                   | HTML tokens | Mosaic tokens | Ratio |
 | --------------------------- | ----------: | ------------: | ----: |
@@ -580,8 +579,8 @@ the building blocks and directives from the manifest, the `expr` catalog, a few 
 the validator-to-model feedback loop; and, where the host controls the decoder, CFG-constrained
 decoding of the Mosaic grammar for validity-by-construction.
 
-Governance: the format evolves through numbered specs with a comment period and two implementations,
-and eventually a home in the MCP UI working group or the Agentic AI Foundation.
+Governance: the format evolves through numbered, reviewed design changes with a comment period and
+two implementations, and eventually a home in the MCP UI working group or the Agentic AI Foundation.
 Long-form **"Mosaic Format"** or **"Mosaic UI"** disambiguates from NCSA Mosaic, the 1990s web
 browser (historical and inactive), in formal publication.
 

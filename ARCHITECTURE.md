@@ -91,8 +91,8 @@ The normative JSON Schemas live in [`schema/`](schema/): `mosaic-v1.schema.json`
 ## Invariants
 
 These are the guarantees every implementation must preserve.
-A change that weakens one is a `proposal`-tagged spec, not an ordinary spec (see [specs/conventions.md](specs/conventions.md)).
-Specs and the proposal reference them by number.
+A change that weakens one is a vision-level change and goes through the [design process](.github/CONTRIBUTING.md#design-changes), never an ordinary patch.
+The proposal and the docs reference them by number.
 
 1. **Mosaic cannot express executable code.**
    Braces admit only JSON-compatible literals plus two whitelisted calls, `token(...)` and `expr(...)`; both are interpreted, neither is executed as code.

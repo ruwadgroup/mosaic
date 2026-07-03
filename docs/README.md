@@ -2,7 +2,7 @@
 
 Mosaic is an open specification with a TypeScript reference implementation.
 The [proposal](proposal.md) defines the format; the pages here document how to use it and how to implement it.
-The reference libraries (`@mosaic/react`, `@mosaic/ansi`, `@mosaic/mcp`) are provided implementations, not the boundary of the format - any stack renders the same IR - and the block catalog and schemas are proposed defaults the [spec process](../specs/README.md) evolves.
+The reference libraries (`@mosaic/react`, `@mosaic/ansi`, `@mosaic/mcp`) are provided implementations, not the boundary of the format - any stack renders the same IR - and the block catalog and schemas are proposed defaults that evolve through the [design process](../.github/CONTRIBUTING.md#design-changes).
 
 ## Learn
 
@@ -25,5 +25,4 @@ The reference libraries (`@mosaic/react`, `@mosaic/ansi`, `@mosaic/mcp`) are pro
   This is the definition of the format: every capability described here is in scope, and the specs cite it by section number.
 - **[../ARCHITECTURE.md](../ARCHITECTURE.md)** - the intended architecture and the nine invariants an implementation must preserve.
 - **[../ROADMAP.md](../ROADMAP.md)** - the staged build order (staging is _order_, not scope: the whole proposal is the target).
-- **[../specs/README.md](../specs/README.md)** - the spec backlog, one row per capability in the proposal.
 - **[../schema/](../schema)** - the normative JSON Schemas: the document, the Host Manifest, and the per-block prop schemas.

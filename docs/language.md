@@ -133,7 +133,7 @@ What each optional field is for:
 - **`kind`** is a convenience discriminator so tooling can classify a node without a registry lookup; when omitted, it resolves from the registry by `type`.
 - **`key`** gives a repeating child a stable identity, so renderers and diff tooling match items across regenerations by identity rather than position.
 - **`slots`** and **`refs`** are reserved: named child regions beyond positional `children`, and hoisted subtrees inlined via `from:ref`.
-  Their wire shape is fixed by the schema, but no shipped renderer consumes them yet; their semantics land with their specs.
+  Their wire shape is fixed by the schema, but no shipped renderer consumes them yet.
 
 The normative schema is [`schema/mosaic-v1.schema.json`](../schema/mosaic-v1.schema.json).
 

@@ -138,7 +138,6 @@ See the [examples README](examples/README.md) for the full set and how to read t
 - **[docs/design-history.md](docs/design-history.md)** - the origin story, in my own words.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - the intended design and the invariants an implementation preserves.
 - **[ROADMAP.md](ROADMAP.md)** - the staged build order.
-- **[specs/](specs)** - one spec per capability, mapped to the proposal.
 - **[schema/](schema)** - the JSON Schemas.
 - **[skills/](skills)** - the attachable agent skill that teaches a model to emit Mosaic; a template hosts edit to mirror their manifest.
 - **[packages/](packages)** - the reference implementation (TypeScript).

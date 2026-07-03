@@ -50,5 +50,5 @@ The design is the particular combination: a JSX wire a model emits for free, a c
 
 ## Where it went from there
 
-The [proposal](proposal.md) froze that shape section by section, the [invariants](../ARCHITECTURE.md#invariants) pinned what implementations must preserve, and the [specs](../specs/README.md) carry it forward capability by capability.
-The block catalog and the schemas are deliberately the _proposed_ defaults - efficient starting points the spec process is meant to evolve - while the grammar, the IR, and the invariants are the parts meant to hold still.
+The [proposal](proposal.md) froze that shape section by section, and the [invariants](../ARCHITECTURE.md#invariants) pinned what implementations must preserve.
+The block catalog and the schemas are deliberately the _proposed_ defaults - efficient starting points meant to evolve in the open - while the grammar, the IR, and the invariants are the parts meant to hold still.

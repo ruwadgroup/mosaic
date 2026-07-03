@@ -129,7 +129,7 @@ A host that supplies its own `components` ignores all of this; the theme exists 
 ### Diagram layout
 
 The reference `Diagram` block draws SVG over `layoutDiagram(props)` - an exported, deterministic, dependency-free layered layout (nodes, edges, group hulls, with geometry only).
-A host that wants ELK-grade layout registers its own `Diagram` in `components` and can still reuse the helper or ignore it entirely ([spec 0304](../specs/0304-diagram-block.md)).
+A host that wants ELK-grade layout registers its own `Diagram` in `components` and can still reuse the helper or ignore it entirely.
 
 ## `@mosaic/ansi` - the text floor
 
