@@ -31,9 +31,9 @@ jobs:
 
       - name: Validate schemas compile
         run: |
-          ajv compile -s schema/mosaic-v1.schema.json
-          ajv compile -s schema/host-manifest.schema.json
-          ajv compile -s schema/primitives.schema.json
+          ajv compile --spec=draft2020 -s schema/mosaic-v1.schema.json
+          ajv compile --spec=draft2020 -s schema/host-manifest.schema.json
+          ajv compile --spec=draft2020 -s schema/primitives.schema.json
 
   markdown-lint:
     name: Markdown lint
