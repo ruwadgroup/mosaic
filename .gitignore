@@ -81,10 +81,6 @@ ehthumbs.db
 .tsup/
 .vitest-cache/
 
-# Bake-off harness outputs
-tools/bakeoff/results/
-tools/bakeoff/runs/
-
 # Misc
 *.log
 *.pid

@@ -11,15 +11,6 @@ pre-commit:
       run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
       stage_fixed: true
 
-    mosaic-canonical:
-      glob: "*.mosaic"
-      run: |
-        if [ -x tools/mosaic-canonical.mjs ]; then
-          node tools/mosaic-canonical.mjs --check {staged_files}
-        else
-          echo "tools/mosaic-canonical.mjs not present yet — skipping."
-        fi
-
 commit-msg:
   commands:
     conventional-commit:
