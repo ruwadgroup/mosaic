@@ -266,16 +266,17 @@ fallback so it still renders where the renderer can't draw it (a `Chart` degrade
 | `List`      | Itemized / virtualizable list with a row template (covers key-value, feeds)                                     |
 | `Tree`      | General hierarchy - file trees, org charts, module maps                                                         |
 | `Board`     | Columns of cards with optional `sortable` - kanban, triage, pipelines                                           |
-| `Timeline`  | Ordered dated/sequenced items with tone                                                                         |
+| `Timeline`  | Ordered dated/sequenced items, `{date, title, description?, tone?}` - incident histories, roadmaps              |
 | `Calendar`  | Month/week/day grid of dated items and events                                                                   |
 | `Stat`      | Big number + label + delta + optional trend                                                                     |
 | `Chart`     | One chart, `type="line \| area \| bar \| donut \| radar \| gauge \| scatter \| heatmap \| sankey \| sparkline"` |
 | `VegaChart` | A full Vega-Lite spec for anything the semantic set doesn't cover - a grammar, not a fixed set; spec is data    |
-| `Canvas`    | Inline sanitized SVG for bespoke diagrams (absorbs flow/sequence diagrams)                                      |
+| `Diagram`   | Declarative nodes / edges / groups; renderer-owned layout; selection binds to state                             |
+| `Canvas`    | Inline sanitized SVG - the bespoke escape hatch for what `Diagram` / `Chart` / `VegaChart` cannot express       |
 | `Embed`     | The gated iframe escape hatch, denied by default                                                                |
 
-Between `Chart`, `VegaChart`'s grammar, and `Canvas`'s raw SVG, an agent can express any
-visualization at all.
+Between `Chart`, `VegaChart`'s grammar, `Diagram`'s declarative graphs, and `Canvas`'s raw SVG, an
+agent can express any visualization at all.
 
 ### 4.4 Host macros
 
@@ -358,11 +359,21 @@ What it has is a client-side reactive loop that needs no round-trip.
 ### 6.1 State, derived values, conditionals, lists
 
 - **State.** `bind:state="eggs"` two-way binds a control; `from:state="eggs"` reads.
+  Both take a **state path**, not just a flat key - `ident (. ident | [ expr ])*` - so
+  `bind:state="filters.region"` and `bind:state="files[i].checked"` are well-formed.
+  `[expr]` index segments are evaluated once, at resolve time, against the current scope (including
+  `for:each` loop variables), yielding the concrete path a renderer reads and writes.
+  Reads follow `expr` member/index semantics (a missing segment yields `null`); writes never invent
+  structure - a write through a missing or mismatched container is a no-op with a dev warning, since
+  the authored `state={{...}}` is the schema.
 - **Derived values.** `from:expr="eggs * 0.5"`, or `{expr("...")}` inline in any prop, computes a
   value that recomputes whenever its inputs change. This is the egg-slider's total.
 - **Conditionals.** `if:show="eggs > 60"` renders a subtree only when the expression holds.
 - **Lists.** `for:each="filter(rows, r, r.price > minPrice) as row"` instantiates a subtree per item
   over a baked-in array, with the item bound in scope.
+  An optional second binding names the zero-based index - `for:each="files as f, i"` - in the same
+  per-iteration scope as the item, which is what makes per-row binds like
+  `bind:state="files[i].checked"` work.
 
 These are declarative directives; all computation is confined to `expr(...)`.
 
@@ -393,6 +404,8 @@ differs by specifying a precise, CEL-grounded catalog A2UI leaves vague.
 
 - **A local mutation** - `state.set("eggs", value)` / `state.toggle("open")` - which Mosaic applies
   to its own store; dependent derived values and `if:show` re-evaluate; no round-trip.
+  Both accept the same state paths as `bind:state` ([§6.1](#61-state-derived-values-conditionals-lists)):
+  `state.set('data.view', 'grid')`, `state.toggle('files[2].checked')`.
 - **A named host intent** - `{ action: "order", args: {...} }` - which Mosaic hands to the host and
   stops. The host decides what to do (call a tool, ask the model, navigate) under its own policy.
 

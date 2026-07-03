@@ -29,11 +29,12 @@ Status legend: `planned` · `draft` · `ready` · `in progress` · `done`.
 
 ## Stage 1 - It is interactive
 
-| #    | Spec                                                         | Proposal § | Package(s)                | Depends on | Status  |
-| ---- | ------------------------------------------------------------ | ---------- | ------------------------- | ---------- | ------- |
-| 0101 | Directives: `bind:state`, `from:state`, `on:event`           | §6.1, §6.3 | mosaic-core, mosaic-react | 0002, 0007 | planned |
-| 0102 | The `expr` language and `from:expr` / `if:show` / `for:each` | §6.2       | mosaic-core               | 0101       | planned |
-| 0103 | mosaic-ansi - the text floor and `decomposeTo`               | §7.2       | mosaic-ansi               | 0004, 0006 | planned |
+| #    | Spec                                                                          | Proposal § | Package(s)                | Depends on | Status  |
+| ---- | ----------------------------------------------------------------------------- | ---------- | ------------------------- | ---------- | ------- |
+| 0101 | Directives: `bind:state`, `from:state`, `on:event`                            | §6.1, §6.3 | mosaic-core, mosaic-react | 0002, 0007 | planned |
+| 0102 | The `expr` language and `from:expr` / `if:show` / `for:each`                  | §6.2       | mosaic-core               | 0101       | planned |
+| 0103 | mosaic-ansi - the text floor and `decomposeTo`                                | §7.2       | mosaic-ansi               | 0004, 0006 | planned |
+| 0104 | Record-shaped state paths (`bind:state` paths, path writes, `for:each` index) | §6.1, §6.3 | mosaic-core, mosaic-react | 0101, 0102 | done    |
 
 **Exit:** the egg-slider works end to end - a slider drives a derived total, a conditional shows itself, a button hands the host a computed intent - and the same artifact degrades to readable text.
 
@@ -48,11 +49,12 @@ Status legend: `planned` · `draft` · `ready` · `in progress` · `done`.
 
 ## Stage 3 - The full catalog
 
-| #    | Spec                                                                                       | Proposal § | Package(s)                | Depends on | Status  |
-| ---- | ------------------------------------------------------------------------------------------ | ---------- | ------------------------- | ---------- | ------- |
-| 0301 | Rich components and `decomposeTo` (DataTable, List, Tree, Board, Timeline, Calendar, Stat) | §4.3       | mosaic-core, mosaic-react | 0006, 0007 | planned |
-| 0302 | The visual model (`Chart` / `VegaChart` / `Canvas`)                                        | §4.3       | mosaic-core, mosaic-react | 0301       | planned |
-| 0303 | The host-macro mechanism                                                                   | §4.4       | mosaic-core               | 0004       | planned |
+| #    | Spec                                                                                       | Proposal § | Package(s)                             | Depends on | Status  |
+| ---- | ------------------------------------------------------------------------------------------ | ---------- | -------------------------------------- | ---------- | ------- |
+| 0301 | Rich components and `decomposeTo` (DataTable, List, Tree, Board, Timeline, Calendar, Stat) | §4.3       | mosaic-core, mosaic-react              | 0006, 0007 | planned |
+| 0302 | The visual model (`Chart` / `VegaChart` / `Canvas`)                                        | §4.3       | mosaic-core, mosaic-react              | 0301       | planned |
+| 0303 | The host-macro mechanism                                                                   | §4.4       | mosaic-core                            | 0004       | planned |
+| 0304 | The `Diagram` block (declarative nodes/edges/groups, renderer-owned layout)                | §4.3       | mosaic-core, mosaic-react, mosaic-ansi | 0301, 0104 | done    |
 
 **Exit:** a chart-heavy dashboard and a filterable `DataTable` render on web and degrade cleanly to text, with all data carried in the artifact.
 

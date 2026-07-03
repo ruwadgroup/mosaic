@@ -68,9 +68,12 @@
       "properties": {
         "bind:state": {
           "type": "string",
-          "description": "Two-way bind, dotted path (e.g. 'filters.region')."
+          "description": "Two-way bind, a state path: an identifier followed by dotted segments and/or [index] segments (e.g. 'filters.region', 'files[i].checked'). [index] expressions are evaluated once, at resolve time, against the current scope - including for:each loop variables - to a concrete path. See docs/proposal.md §6.1."
         },
-        "from:state": { "type": "string", "description": "Read-only bind, dotted path." },
+        "from:state": {
+          "type": "string",
+          "description": "Read-only bind; same state path grammar as bind:state (dotted and [index] segments)."
+        },
         "from:expr": {
           "type": "string",
           "description": "Derived value: a bounded expr(...) expression that recomputes when its inputs change. See docs/proposal.md §6.2."
@@ -81,7 +84,7 @@
         },
         "for:each": {
           "type": "string",
-          "description": "Repeater over a baked-in array, e.g. \"filter(rows, r, r.price > minPrice) as row\". The child subtree is instantiated once per item."
+          "description": "Repeater over a baked-in array, e.g. \"filter(rows, r, r.price > minPrice) as row\". The child subtree is instantiated once per item. An optional second binding names the zero-based index - \"files as f, i\" - bound in the same per-iteration scope as the item."
         },
         "on:event": {
           "type": "object",

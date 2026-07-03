@@ -109,7 +109,7 @@
     "Carousel": { "type": "object" },
 
     "_dataviz": {
-      "const": "DataTable, List, Tree, Board, Timeline, Calendar, Stat, Chart, VegaChart, Canvas, Embed"
+      "const": "DataTable, List, Tree, Board, Timeline, Calendar, Stat, Chart, VegaChart, Diagram, Canvas, Embed"
     },
     "DataTable": {
       "type": "object",
@@ -127,7 +127,36 @@
       "type": "object",
       "description": "Columns of cards, optional sortable. Kanban/triage/pipeline are instances."
     },
-    "Timeline": { "type": "object", "description": "Ordered dated/sequenced items with tone." },
+    "Timeline": {
+      "type": "object",
+      "description": "Ordered dated/sequenced items with tone.",
+      "properties": {
+        "props": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["date", "title"],
+                "properties": {
+                  "date": { "type": "string" },
+                  "title": { "type": "string" },
+                  "description": {
+                    "type": "string",
+                    "description": "Optional detail line under the title."
+                  },
+                  "tone": {
+                    "type": "string",
+                    "description": "Semantic tone token (ok | warn | bad | neutral | ...); colors the item marker."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Calendar": { "type": "object", "description": "Month/week/day grid of dated items." },
     "Stat": { "type": "object", "description": "Big number + label + delta + optional trend." },
     "Chart": {
@@ -161,9 +190,102 @@
       "type": "object",
       "description": "Full Vega-Lite v5 spec as inline JSON literal. A grammar, not a fixed set. Spec is data, not code. alt required."
     },
+    "Diagram": {
+      "type": "object",
+      "description": "Declarative node/edge/group diagram - flows, architecture maps, funnels, concept shifts. The renderer owns layout; selection binds to state via bind:state. alt required.",
+      "properties": {
+        "props": {
+          "type": "object",
+          "required": ["alt", "nodes", "edges"],
+          "properties": {
+            "alt": {
+              "type": "string",
+              "minLength": 1,
+              "description": "REQUIRED. Validation fails without it. See docs/proposal.md §4.1."
+            },
+            "direction": {
+              "enum": ["right", "down"],
+              "description": "Main layout axis. Default 'right'."
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "label"],
+                "properties": {
+                  "id": { "type": "string", "description": "Unique across nodes and groups." },
+                  "label": { "type": "string" },
+                  "sublabel": { "type": "string", "description": "Second line under the label." },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "service",
+                          "store",
+                          "queue",
+                          "client",
+                          "external",
+                          "concept",
+                          "code"
+                        ]
+                      },
+                      { "type": "string" }
+                    ],
+                    "description": "Semantic shape token; 'code' renders monospaced. Forward-compatible: an unknown kind renders as the default box."
+                  },
+                  "tone": {
+                    "type": "string",
+                    "description": "Semantic tone token (ok | warn | bad | neutral | ...)."
+                  },
+                  "badge": {
+                    "type": "string",
+                    "description": "Short corner annotation, e.g. 'p95 340ms'."
+                  },
+                  "group": { "type": "string", "description": "References a groups[].id." },
+                  "detail": {
+                    "type": "string",
+                    "description": "One-liner surfaced by renderers on selection/hover."
+                  }
+                }
+              }
+            },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["from", "to"],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "description": "A nodes[].id or groups[].id; a group edge attaches to the group hull."
+                  },
+                  "to": { "type": "string", "description": "A nodes[].id or groups[].id." },
+                  "label": { "type": "string" },
+                  "tone": { "type": "string" },
+                  "dashed": { "type": "boolean", "description": "Async / optional path." },
+                  "bidirectional": { "type": "boolean", "description": "Default false (directed)." }
+                }
+              }
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "label"],
+                "properties": {
+                  "id": { "type": "string", "description": "Unique across nodes and groups." },
+                  "label": { "type": "string" },
+                  "tone": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Canvas": {
       "type": "object",
-      "description": "Inline sanitized SVG (svg prop) for bespoke diagrams. Data is in the artifact. alt required."
+      "description": "Inline sanitized SVG (svg prop) - the bespoke escape hatch for what Diagram/Chart/VegaChart cannot express. Data is in the artifact. alt required."
     },
     "Embed": {
       "type": "object",
