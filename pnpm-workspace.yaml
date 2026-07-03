@@ -1,4 +1,3 @@
 packages:
   - "packages/ts/*"
-  - "tools"
   - "demo"

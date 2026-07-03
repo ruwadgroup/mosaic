@@ -307,14 +307,7 @@ function parseAttrValue(src: Source): PropValue {
 /** The brace grammar: JSON-compatible literals plus token("…") and expr("…").
  *  This is the compile-time safety guarantee (invariant 1). */
 function parseBraceLiteral(src: Source): PropValue {
-  src.skipWs();
-  // strip comments inside literals (e.g. multiline arrays with notes)
-  while (src.startsWith('/*')) {
-    const end = src.text.indexOf('*/', src.pos);
-    if (end === -1) src.fail('unterminated comment', 'UNTERMINATED_COMMENT');
-    src.pos = end + 2;
-    src.skipWs();
-  }
+  skipLiteralWs(src);
   const c = src.at();
   if (c === '"' || c === "'") return readString(src);
   if (c === '{') return readObject(src);

@@ -971,6 +971,19 @@ function renderChildren(node: MosaicNode, ctx: RenderContext, path: string): Rea
   );
 }
 
+// args were resolved against state during resolve(); they are plain values here
+function fireAction(ctx: RenderContext, action: ActionRef): void {
+  if (typeof action === 'object' && action.args) {
+    const args: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(action.args)) {
+      args[k] = isExprRef(v) ? undefined : v;
+    }
+    ctx.dispatch(action, args);
+    return;
+  }
+  ctx.dispatch(action);
+}
+
 function eventHandlers(
   node: MosaicNode,
   ctx: RenderContext,
@@ -980,18 +993,7 @@ function eventHandlers(
   const handlers: Record<string, () => void> = {};
   for (const [event, action] of Object.entries(events)) {
     const key = `on${event.charAt(0).toUpperCase()}${event.slice(1)}`;
-    handlers[key] = () => {
-      if (typeof action === 'object' && action.args) {
-        // args were resolved against state during resolve(); they are plain values here
-        const args: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(action.args)) {
-          args[k] = isExprRef(v) ? undefined : v;
-        }
-        ctx.dispatch(action, args);
-        return;
-      }
-      ctx.dispatch(action);
-    };
+    handlers[key] = () => fireAction(ctx, action);
   }
   return handlers;
 }
@@ -1010,17 +1012,7 @@ function renderNode(node: MosaicNode, ctx: RenderContext, key: string): React.Re
     for (const [k, v] of Object.entries(node.props ?? {})) resolvedProps[k] = tokenValue(ctx, v);
     const events: Record<string, () => void> = {};
     for (const [event, action] of Object.entries(node.directives?.['on:event'] ?? {})) {
-      events[event] = () => {
-        if (typeof action === 'object' && action.args) {
-          const args: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(action.args)) {
-            args[k] = isExprRef(v) ? undefined : v;
-          }
-          ctx.dispatch(action, args);
-          return;
-        }
-        ctx.dispatch(action);
-      };
+      events[event] = () => fireAction(ctx, action);
     }
     return h(Custom, {
       key,
