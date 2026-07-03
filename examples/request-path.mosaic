@@ -1,66 +1,81 @@
 ```mosaic v=1 id=request-path
-<Stack gap="2" state={{ stage: "" }}>
-  {/* A system-design walkthrough. The agent explains the request path by drawing
-      it, not describing it - five tone-coded stages, arrows between them, and each
-      stage clickable. Clicking is a *local* mutation: it selects the stage and the
-      detail panel below re-renders, no round-trip. */}
+<Stack gap="3" state={{ selected: "api" }}>
+  {/* A system-design walkthrough, drawn not described. The Diagram is data -
+      nodes, edges, one group hull - and the renderer owns the geometry. Clicking
+      a node is a *local* mutation: it writes the id into `selected` and the
+      detail card below re-renders, no round-trip. Only "Open runbook" leaves
+      the artifact, as a named intent. */}
 
   <Stack gap="1">
-    <Heading>Request path - a checkout, browser to database</Heading>
-    <Text tone="subtle">Client and edge in grey, your services in green. Tap a stage to inspect what happens there.</Text>
+    <Heading>How a checkout request flows</Heading>
+    <Text tone="subtle">Click a node to inspect it. The jobs queue is the bottleneck - checkout blocks on a 3.4s enqueue.</Text>
   </Stack>
 
-  <Card on:event={{ click: "state.set('stage', 'browser')" }}>
-    <Heading level={3}>Browser</Heading>
-    <Text tone="subtle">Initiates the page load; holds the cart in local state</Text>
-  </Card>
-  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
+  <Diagram
+    alt="Checkout request path: client to edge, edge to auth and api, api to postgres, redis, and the jobs queue in the data plane, queue drained asynchronously by the worker"
+    direction="right"
+    bind:state="selected"
+    nodes={[
+      { id: "client", label: "Client",     kind: "client" },
+      { id: "edge",   label: "Edge / LB",  kind: "service" },
+      { id: "auth",   label: "Auth",       kind: "service" },
+      { id: "api",    label: "API",        kind: "service" },
+      { id: "pg",     label: "Postgres",   kind: "store", group: "data" },
+      { id: "redis",  label: "Redis",      kind: "store", group: "data" },
+      { id: "queue",  label: "Jobs queue", kind: "queue", group: "data", tone: "warn", badge: "p95 3.4s" },
+      { id: "worker", label: "Worker",     kind: "service" }
+    ]}
+    edges={[
+      { from: "client", to: "edge",   label: "https" },
+      { from: "edge",   to: "auth" },
+      { from: "edge",   to: "api" },
+      { from: "api",    to: "pg" },
+      { from: "api",    to: "redis" },
+      { from: "api",    to: "queue",  label: "enqueue", tone: "warn" },
+      { from: "queue",  to: "worker", label: "async", dashed: true }
+    ]}
+    groups={[{ id: "data", label: "Data plane" }]} />
 
-  <Card on:event={{ click: "state.set('stage', 'edge')" }}>
-    <Heading level={3}>CDN / edge</Heading>
-    <Text tone="subtle">Serves static assets; terminates TLS close to the user</Text>
-  </Card>
-  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
-
-  <Card tone="ok" on:event={{ click: "state.set('stage', 'gateway')" }}>
-    <Heading level={3}>API gateway</Heading>
-    <Text tone="subtle">Authenticates, rate-limits, and routes API requests</Text>
-  </Card>
-  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
-
-  <Card tone="ok" on:event={{ click: "state.set('stage', 'services')" }}>
-    <Heading level={3}>Backend services</Heading>
-    <Text tone="subtle">Product, cart, and checkout - the business logic</Text>
-  </Card>
-  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
-
-  <Card tone="ok" on:event={{ click: "state.set('stage', 'db')" }}>
-    <Heading level={3}>Database</Heading>
-    <Text tone="subtle">Persists orders and decrements inventory in one transaction</Text>
-  </Card>
-
-  {/* The detail panel - one local variable drives which explanation shows. */}
-  <Card gap="2">
-    <Empty if:show="stage == ''">Select a stage above to inspect it.</Empty>
-    <Stack if:show="stage == 'browser'" gap="1">
-      <Heading level={3}>At the browser</Heading>
-      <Text>The cart lives in local state until checkout. The only thing that leaves the device is the final <Code>POST /api/checkout</Code> - everything before it is a read.</Text>
+  {/* The detail card - `selected` drives which explanation shows. */}
+  <Card gap="1">
+    <Empty if:show="selected == null">Click a node above to inspect it.</Empty>
+    <Stack if:show="selected == 'client'" gap="1">
+      <Heading level={3}>Client</Heading>
+      <Text>The storefront app. Nothing wrong here - its TTFB is dominated by the API call, so the fix belongs upstream.</Text>
     </Stack>
-    <Stack if:show="stage == 'edge'" gap="1">
-      <Heading level={3}>At the edge</Heading>
-      <Text>Static assets are cached here and never touch your origin. A cache hit on <Code>/product-1.jpg</Code> is the difference between 12 ms and 120 ms.</Text>
+    <Stack if:show="selected == 'edge'" gap="1">
+      <Heading level={3}>Edge / LB</Heading>
+      <Text>Terminates TLS and routes by path. p95 is 4 ms - healthy, and out of this story.</Text>
     </Stack>
-    <Stack if:show="stage == 'gateway'" gap="1">
-      <Heading level={3}>At the gateway</Heading>
-      <Text>The token is verified once, here, and the trusted claims are passed inward. Rate limits are enforced before any service does work - the cheapest place to shed load.</Text>
+    <Stack if:show="selected == 'auth'" gap="1">
+      <Heading level={3}>Auth</Heading>
+      <Text>Token verification, 2 ms on the cache-hit path. Not on the checkout critical path.</Text>
     </Stack>
-    <Stack if:show="stage == 'services'" gap="1">
-      <Heading level={3}>In the services</Heading>
-      <Text>Checkout calls product for price, cart for contents, then payment. This chain is serial - each call waits on the last - which is why the tail of the load is the place to optimize.</Text>
+    <Stack if:show="selected == 'api'" gap="1">
+      <Heading level={3}>API</Heading>
+      <Text>Fans out to Postgres, Redis, and the jobs queue. The checkout handler awaits the enqueue ack synchronously - that is the smell.</Text>
     </Stack>
-    <Stack if:show="stage == 'db'" gap="1">
-      <Heading level={3}>At the database</Heading>
-      <Text>Order insert and inventory decrement happen in one transaction, so a payment can never succeed against stock that was already sold.</Text>
+    <Stack if:show="selected == 'pg'" gap="1">
+      <Heading level={3}>Postgres</Heading>
+      <Text>Order insert and inventory decrement in one transaction, 18 ms p95. Fine.</Text>
+    </Stack>
+    <Stack if:show="selected == 'redis'" gap="1">
+      <Heading level={3}>Redis</Heading>
+      <Text>Cart reads, sub-millisecond. Fine.</Text>
+    </Stack>
+    <Stack if:show="selected == 'queue'" gap="1">
+      <Stack direction="horizontal" gap="2">
+        <Heading level={3}>Jobs queue</Heading>
+        <Badge tone="warn">p95 3.4s</Badge>
+      </Stack>
+      <Text>Enqueue p95 is 3.4 s under load - the broker fsyncs once per message, and checkout blocks on the ack. Make the enqueue fire-and-forget, or batch the fsync.</Text>
+      <Button tone="primary" on:event={{ click: { action: "openRunbook", args: { service: "queue" } } }}>
+        Open runbook
+      </Button>
+    </Stack>
+    <Stack if:show="selected == 'worker'" gap="1">
+      <Heading level={3}>Worker</Heading>
+      <Text>Drains the queue: payment capture, receipt email, warehouse sync. Healthy - the problem is upstream, at enqueue.</Text>
     </Stack>
   </Card>
 

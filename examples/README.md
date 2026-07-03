@@ -18,7 +18,8 @@ Styling is theme-only (`tone="warn"`, never a hex), and interaction is local and
 | [`pricing-estimator.mosaic`](./pricing-estimator.mosaic)       | **Mock UI** - a pricing page whose numbers are real          | `Slider`/`Toggle`/`SegmentedControl` driving live `Stat`s, a `Chart`, and a CTA - every figure a derived `expr`, recomputed locally                  |
 | [`mock-settings.mosaic`](./mock-settings.mosaic)               | **Mock UI** - a settings screen before you build it          | The control catalog wired to state: `Field` + `Input`/`Select`/`Radio`/`Toggle`/`Checkbox`/`Slider`, tabbed by `SegmentedControl`, one `Save` intent |
 | [`plan-migration.mosaic`](./plan-migration.mosaic)             | **Plan** - a migration you can work from                     | `Steps` + `Timeline` + `Stat` + `Progress` + a risk `DataTable`, and a `List` that **filters live by owner** with `for:each` over `filter(...)`      |
-| [`request-path.mosaic`](./request-path.mosaic)                 | **Explain** - a system design, drawn not described           | Tone-coded `Card` stages with `Canvas` arrows; each stage is clickable (`state.set`) and reveals its detail panel via `if:show`                      |
+| [`review-changes.mosaic`](./review-changes.mosaic)             | **Ship** - a diff review that hands you the call             | **Record state** - `for:each="files as f, i"` rows, `Checkbox`es bound to `files[i].checked`, stats and commit button folding over one `files` array |
+| [`request-path.mosaic`](./request-path.mosaic)                 | **Explain** - a system design, drawn not described           | A clickable `Diagram` - selection binds to state, `if:show` swaps the detail card per node, and the queue's card carries an `openRunbook` intent     |
 | [`network-waterfall.mosaic`](./network-waterfall.mosaic)       | **Visualize** - a performance trace made visible             | A `VegaChart` waterfall of a page load, a `Stat` row, a `DataTable` of requests, and a `Callout` calling out the serial tail                         |
 
 ## How to read them
@@ -27,13 +28,14 @@ Two families run through the set:
 
 **Static-but-rich** (`compare`, `network-waterfall`) is thinking made _legible_ - the agent's analysis laid out as a real interface instead of a wall of prose. No interaction; all the value is in the composition and the theme.
 
-**Local and reactive** (`pricing-estimator`, `mock-settings`, `plan-migration`, `request-path`) adds a client-side loop that needs no round-trip:
+**Local and reactive** (`pricing-estimator`, `mock-settings`, `plan-migration`, `request-path`, `review-changes`) adds a client-side loop that needs no round-trip:
 
 - `bind:state="seats"` two-way binds a control; `state={{ … }}` on the root bakes in the starting data.
-- `{expr("…")}` is a **derived value** - a bounded, pure expression that recomputes whenever its inputs change. The pricing total, the "showing N of M" line, and the progress bar are all `expr` folds (`count`, `filter`, `sum`, ternaries) over baked-in state.
-- `if:show="tab == 'Profile'"` renders a subtree only when a condition holds.
-- `for:each="filter(tasks, t, …) as task"` instantiates a row per item over a baked-in array.
-- `on:event={{ click: "state.set('stage', 'db')" }}` mutates local state (no round-trip); `on:event={{ click: { action: "startCheckout", args: { total: expr("…") } } }}` hands the **host** a named intent carrying the _computed_ value. Only the second one leaves the artifact.
+  Bind targets are **paths**: `bind:state="files[i].checked"` writes one field of one record, and `bind:state="selected"` on a `Diagram` holds the clicked node's id.
+- `{expr("…")}` is a **derived value** - a bounded, pure expression that recomputes whenever its inputs change. The pricing total, the "showing N of M" line, and the commit button label are all `expr` folds (`count`, `filter`, `sum`, ternaries) over baked-in state.
+- `if:show="selected == 'queue'"` renders a subtree only when a condition holds.
+- `for:each="files as f, i"` instantiates a row per item over a baked-in array, binding the item and its index; the expression form `for:each="filter(tasks, t, …) as task"` iterates a derived list.
+- Clicking a `Diagram` node (or `on:event={{ click: "state.set('stage', 'db')" }}` anywhere) mutates local state - no round-trip; `on:event={{ click: { action: "startCheckout", args: { total: expr("…") } } }}` hands the **host** a named intent carrying the _computed_ value. Only the second one leaves the artifact.
 
 Nothing here fetches, subscribes, or runs code. The data is baked in when the model produces it, and every expression is interpreted, terminating, and side-effect-free ([invariant 2](../ARCHITECTURE.md#invariants)).
 
