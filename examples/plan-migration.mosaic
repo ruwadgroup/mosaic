@@ -1,0 +1,80 @@
+```mosaic v=1 id=plan-migration
+<Stack gap="4" state={{
+    owner: "everyone",
+    tasks: [
+      { id: "M-1", title: "Freeze schema changes on the legacy DB", owner: "@sara", phase: "Plan",         status: "done",    due: "Jul 08" },
+      { id: "M-2", title: "Dual-write adapter behind a flag",        owner: "@ravi", phase: "Dual-write",   status: "done",    due: "Jul 15" },
+      { id: "M-3", title: "Backfill 4.2M rows in batches",           owner: "@ravi", phase: "Backfill",     status: "active",  due: "Jul 22" },
+      { id: "M-4", title: "Row-count + checksum parity check",       owner: "@kim",  phase: "Verify",       status: "blocked", due: "Jul 26" },
+      { id: "M-5", title: "Flip reads to the new store",             owner: "@sara", phase: "Verify",       status: "todo",    due: "Jul 29" },
+      { id: "M-6", title: "Decommission legacy replicas",            owner: "@ravi", phase: "Decommission", status: "todo",    due: "Aug 05" }
+    ]
+  }}>
+  {/* A plan you can work from, not just read. The agent laid out a database
+      migration - phases, milestones, owners, risks - and the task list filters
+      live by owner. Progress and the "showing N of M" line are derived from the
+      same baked-in data with expr folds, so they can never drift from the list. */}
+
+  <Stack gap="1">
+    <Heading>Migration - legacy Postgres to the new store</Heading>
+    <Text tone="subtle">Six milestones across five phases. Target GA is Aug 05.</Text>
+  </Stack>
+
+  <Grid cols={12} gap="3">
+    <Stat slot:name="a" label="Milestones done" value={expr("concat(count(filter(tasks, t, t.status == 'done')), ' / ', count(tasks))")} />
+    <Stat slot:name="b" label="In progress"    value={expr("count(filter(tasks, t, t.status == 'active'))")} />
+    <Stat slot:name="c" label="Blocked"        value={expr("count(filter(tasks, t, t.status == 'blocked'))")} tone="bad" />
+    <Stat slot:name="d" label="Target"         value="Aug 05" />
+  </Grid>
+
+  <Progress
+    label={expr("concat(round(100 * count(filter(tasks, t, t.status == 'done')) / count(tasks)), '% complete')")}
+    value={expr("round(100 * count(filter(tasks, t, t.status == 'done')) / count(tasks))")} />
+
+  <Steps current={2} items={["Plan", "Dual-write", "Backfill", "Verify", "Decommission"]} />
+
+  <Timeline items={[
+    { date: "Jul 08", title: "Schema frozen",          tone: "ok"   },
+    { date: "Jul 15", title: "Dual-write live",        tone: "ok"   },
+    { date: "Jul 22", title: "Backfill running",       tone: "warn" },
+    { date: "Jul 26", title: "Parity check - blocked", tone: "bad"  },
+    { date: "Aug 05", title: "Legacy decommissioned",  tone: "ok"   }
+  ]} />
+
+  <Divider />
+
+  <Stack direction="horizontal" gap="3">
+    <Field label="Filter by owner">
+      <Select bind:state="owner" options={["everyone", "@sara", "@ravi", "@kim"]} />
+    </Field>
+    <Text tone="subtle">
+      {expr("concat('Showing ', count(filter(tasks, t, owner == 'everyone' || t.owner == owner)), ' of ', count(tasks), ' milestones')")}
+    </Text>
+  </Stack>
+
+  <List for:each="filter(tasks, t, owner == 'everyone' || t.owner == owner) as task">
+    <Card key={expr("task.id")} gap="1">
+      <Stack direction="horizontal" gap="2">
+        <Badge tone={expr("task.status == 'done' ? 'ok' : task.status == 'active' ? 'warn' : task.status == 'blocked' ? 'bad' : 'subtle'")}>
+          {expr("task.status")}
+        </Badge>
+        <Text weight="bold">{expr("task.title")}</Text>
+      </Stack>
+      <Text tone="subtle">{expr("concat(task.id, ' · ', task.phase, ' · ', task.owner, ' · due ', task.due)")}</Text>
+    </Card>
+  </List>
+
+  <Divider />
+
+  <Heading level={3}>Risks</Heading>
+  <DataTable
+    columns={["Risk", "Likelihood", "Impact", "Mitigation"]}
+    rows={[
+      ["Backfill lags writes",   "med",  "high", "Throttle batches; dual-write keeps the new store current"],
+      ["Checksum mismatch",      "med",  "high", "Parity check gates the read-flip; re-backfill the deltas"],
+      ["Read-flip regressions",  "low",  "high", "Flag-guarded, per-tenant rollout with instant rollback"],
+      ["Legacy decommissioned early", "low", "med", "Keep replicas read-only for 14 days after flip"]
+    ]} />
+
+</Stack>
+```

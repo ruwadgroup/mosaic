@@ -1,0 +1,104 @@
+```mosaic v=1 id=mock-settings
+<Stack gap="4" state={{
+    tab: "Profile",
+    displayName: "Ada Lovelace",
+    handle: "ada",
+    role: "admin",
+    timezone: "Europe/Berlin",
+    digest: "weekly",
+    channels: ["email"],
+    snoozeUntil: "2026-07-14",
+    productEmails: true,
+    securityAlerts: true,
+    domains: ["acme.com"],
+    theme: "system",
+    accent: "#7c7cff",
+    density: 3,
+    seatAlerts: true
+  }}>
+  {/* Mock a real screen before anyone builds it. This is a workspace-settings
+      page: tabbed sections with a default tab, the full control catalog wired
+      to local state, and a single Save that hands the host the whole settings
+      object as an intent. Click through it and feel the shape before writing
+      a line of React. */}
+
+  <Stack gap="1">
+    <Heading>Workspace settings</Heading>
+    <Text tone="subtle">A mock of the settings screen - every control is live, nothing is wired to a backend yet.</Text>
+  </Stack>
+
+  <Tabs bind:state="tab" active="Profile" items={["Profile", "Notifications", "Appearance"]}>
+
+    <Card gap="3">
+      <Field label="Display name">
+        <Input type="text" bind:state="displayName" placeholder="Your name" />
+      </Field>
+      <Field label="Handle" help="Used in @mentions and your profile URL.">
+        <Input type="text" bind:state="handle" placeholder="username" />
+      </Field>
+      <Field label="Role">
+        <Select bind:state="role" options={["admin", "member", "billing", "read-only"]} />
+      </Field>
+      <Autocomplete
+        label="Timezone"
+        bind:state="timezone"
+        placeholder="Start typing a city or region"
+        options={["Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Dhaka", "Asia/Tokyo", "Australia/Sydney"]} />
+      <Callout if:show="role == 'admin'" tone="warn">
+        Admins can remove members and change billing. Grant this sparingly.
+      </Callout>
+    </Card>
+
+    <Card gap="3">
+      <Field label="Activity digest">
+        <Radio bind:state="digest" options={["realtime", "daily", "weekly", "off"]} />
+      </Field>
+      <MultiSelect
+        label="Notify me on"
+        bind:state="channels"
+        options={["email", "push", "SMS", "in-app"]} />
+      <DatePicker label="Snooze non-critical notifications until" bind:state="snoozeUntil" />
+      <Toggle bind:state="productEmails" label="Email me about new features" />
+      <Toggle bind:state="securityAlerts" label="Always email me about sign-ins and key changes" />
+      <Callout if:show="!securityAlerts" tone="bad">
+        Security alerts are off. You won't be told about a new sign-in to your account.
+      </Callout>
+      <TagInput
+        label="Auto-approve sign-ups from these domains"
+        bind:state="domains"
+        placeholder="acme.com" />
+      <Checkbox bind:state="seatAlerts" label="Warn me when we're within 2 seats of the plan cap" />
+    </Card>
+
+    <Card gap="3">
+      <Field label="Theme">
+        <SegmentedControl bind:state="theme" options={["system", "light", "dark"]} />
+      </Field>
+      <ColorPicker label="Accent color" bind:state="accent" />
+      <Field label="Density" help={expr("concat('Level ', density, ' of 5 - ', density <= 2 ? 'roomy' : density >= 4 ? 'compact' : 'default')")}>
+        <Slider bind:state="density" min={1} max={5} step={1} />
+      </Field>
+    </Card>
+
+  </Tabs>
+
+  <Divider />
+
+  <Stack direction="horizontal" gap="2">
+    <Button tone="subtle" on:event={{ click: { action: "resetSettings" } }}>Reset</Button>
+    <Button
+      tone="primary"
+      on:event={{ click: { action: "saveSettings", args: {
+        displayName: expr("displayName"),
+        handle: expr("handle"),
+        role: expr("role"),
+        timezone: expr("timezone"),
+        notifications: { digest: expr("digest"), channels: expr("channels"), snoozeUntil: expr("snoozeUntil"), productEmails: expr("productEmails"), securityAlerts: expr("securityAlerts"), seatAlerts: expr("seatAlerts"), domains: expr("domains") },
+        appearance: { theme: expr("theme"), accent: expr("accent"), density: expr("density") }
+      } } }}>
+      Save changes
+    </Button>
+  </Stack>
+
+</Stack>
+```

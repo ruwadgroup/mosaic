@@ -1,0 +1,51 @@
+```mosaic v=1 id=command-approval
+<Stack gap="4" state={{ scope: "Just once" }}>
+  {/* The permission-prompt artifact: instead of a yes/no modal, the agent lays
+      out exactly what the command touches and lets you pick an approval scope.
+      The Allow button label and intent args derive from the same radio state,
+      so the approval that reaches the host is data, not a click. */}
+
+  <Stack direction="horizontal" gap="2">
+    <Heading level={2}>Approval needed</Heading>
+    <Badge tone="warn">writes to your database</Badge>
+  </Stack>
+
+  <Code value="pnpm drizzle-kit migrate" />
+
+  <Text>
+    This applies the one pending migration, 0042_sessions.sql: it adds a last_seen_at column to sessions and changes the DEFAULT on expires_at. It is the last step of the session-store refactor.
+  </Text>
+
+  <DataTable
+    columns={["What", "Where"]}
+    rows={[
+      ["Database",       "mosaic_dev on localhost:5432"],
+      ["Tables touched", "sessions (ALTER TABLE, exclusive lock)"],
+      ["Reversible",     "no down migration yet"],
+      ["Expected time",  "under 1s at dev-database size"]
+    ]} />
+
+  <Callout tone="warn">
+    Blast radius: local only, but the ALTER takes an exclusive lock on sessions - anything using the dev server pauses for the duration. Nothing here touches staging or production.
+  </Callout>
+
+  <Field label="Approval scope">
+    <Radio bind:state="scope" options={["Just once", "This session", "Always for this command"]} />
+  </Field>
+
+  <Stack direction="horizontal" gap="2">
+    <Button
+      tone="primary"
+      on:event={{ click: { action: "approveCommand", args: {
+        command: "pnpm drizzle-kit migrate",
+        scope: expr("scope")
+      } } }}>
+      {expr("scope == 'Just once' ? 'Allow once' : scope == 'This session' ? 'Allow for this session' : 'Always allow this command'")}
+    </Button>
+    <Button on:event={{ click: { action: "denyCommand", args: { command: "pnpm drizzle-kit migrate" } } }}>
+      Deny
+    </Button>
+  </Stack>
+
+</Stack>
+```

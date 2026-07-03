@@ -1,0 +1,66 @@
+```mosaic v=1 id=network-waterfall
+<Stack gap="4">
+  {/* A performance trace, made visible. The agent traced a page load and wants
+      you to *see* the shape of it - a devtools-style waterfall - not read a
+      paragraph about it. VegaChart carries the Gantt; a table carries the detail. */}
+
+  <Stack gap="1">
+    <Heading>Page load - /checkout, cold cache</Heading>
+    <Text tone="subtle">
+      The nine requests the browser made to render the checkout page, in order, with when each started and how long it took.
+    </Text>
+  </Stack>
+
+  <Grid cols={12} gap="3">
+    <Stat slot:name="a" label="Total load"   value="642 ms" />
+    <Stat slot:name="b" label="Requests"     value="9" />
+    <Stat slot:name="c" label="Transferred"  value="1.2 MB" />
+    <Stat slot:name="d" label="On critical path" value="payment" tone="bad" />
+  </Grid>
+
+  <VegaChart
+    alt="Waterfall of 9 requests loading /checkout over 642 ms. The document, stylesheet and script load first; the products API and two images fetch in parallel behind them; then cart, checkout and payment serialize at the tail, with payment finishing last at 642 ms."
+    spec={{
+      "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+      "height": 260,
+      "data": { "values": [
+        { "req": "GET /index.html",    "type": "Document",   "start": 0,   "end": 48  },
+        { "req": "GET /styles.css",    "type": "Stylesheet", "start": 52,  "end": 121 },
+        { "req": "GET /main.js",       "type": "Script",     "start": 58,  "end": 163 },
+        { "req": "GET /api/products",  "type": "API / XHR",  "start": 92,  "end": 337 },
+        { "req": "GET /logo.png",      "type": "Image",      "start": 120, "end": 181 },
+        { "req": "GET /product-1.jpg", "type": "Image",      "start": 128, "end": 249 },
+        { "req": "GET /api/cart",      "type": "API / XHR",  "start": 351, "end": 437 },
+        { "req": "POST /api/checkout", "type": "API / XHR",  "start": 452, "end": 561 },
+        { "req": "POST /api/payment",  "type": "API / XHR",  "start": 568, "end": 642 }
+      ]},
+      "mark": { "type": "bar", "cornerRadius": 2 },
+      "encoding": {
+        "y":  { "field": "req",  "type": "nominal", "sort": null, "axis": { "title": null } },
+        "x":  { "field": "start","type": "quantitative", "title": "Time (ms)" },
+        "x2": { "field": "end" },
+        "color": { "field": "type", "type": "nominal", "title": "Resource" }
+      }
+    }} />
+
+  <DataTable
+    columns={["Request", "Type", "Start", "Duration", "Size"]}
+    rows={[
+      ["GET /index.html",    "Document",   "0 ms",   "48 ms",  "14 KB"],
+      ["GET /styles.css",    "Stylesheet", "52 ms",  "69 ms",  "31 KB"],
+      ["GET /main.js",       "Script",     "58 ms",  "105 ms", "248 KB"],
+      ["GET /api/products",  "API / XHR",  "92 ms",  "245 ms", "88 KB"],
+      ["GET /logo.png",      "Image",      "120 ms", "61 ms",  "9 KB"],
+      ["GET /product-1.jpg", "Image",      "128 ms", "121 ms", "612 KB"],
+      ["GET /api/cart",      "API / XHR",  "351 ms", "86 ms",  "4 KB"],
+      ["POST /api/checkout", "API / XHR",  "452 ms", "109 ms", "6 KB"],
+      ["POST /api/payment",  "API / XHR",  "568 ms", "74 ms",  "2 KB"]
+    ]} />
+
+  <Callout tone="warn">
+    The tail is serial: cart waits on products, checkout waits on cart, payment waits on checkout.
+    That last chain is 291 ms of the 642 - the place a fix would actually move the number.
+  </Callout>
+
+</Stack>
+```

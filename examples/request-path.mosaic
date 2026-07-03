@@ -1,0 +1,68 @@
+```mosaic v=1 id=request-path
+<Stack gap="2" state={{ stage: "" }}>
+  {/* A system-design walkthrough. The agent explains the request path by drawing
+      it, not describing it - five tone-coded stages, arrows between them, and each
+      stage clickable. Clicking is a *local* mutation: it selects the stage and the
+      detail panel below re-renders, no round-trip. */}
+
+  <Stack gap="1">
+    <Heading>Request path - a checkout, browser to database</Heading>
+    <Text tone="subtle">Client and edge in grey, your services in green. Tap a stage to inspect what happens there.</Text>
+  </Stack>
+
+  <Card on:event={{ click: "state.set('stage', 'browser')" }}>
+    <Heading level={3}>Browser</Heading>
+    <Text tone="subtle">Initiates the page load; holds the cart in local state</Text>
+  </Card>
+  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
+
+  <Card on:event={{ click: "state.set('stage', 'edge')" }}>
+    <Heading level={3}>CDN / edge</Heading>
+    <Text tone="subtle">Serves static assets; terminates TLS close to the user</Text>
+  </Card>
+  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
+
+  <Card tone="ok" on:event={{ click: "state.set('stage', 'gateway')" }}>
+    <Heading level={3}>API gateway</Heading>
+    <Text tone="subtle">Authenticates, rate-limits, and routes API requests</Text>
+  </Card>
+  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
+
+  <Card tone="ok" on:event={{ click: "state.set('stage', 'services')" }}>
+    <Heading level={3}>Backend services</Heading>
+    <Text tone="subtle">Product, cart, and checkout - the business logic</Text>
+  </Card>
+  <Canvas alt="arrow pointing down" svg="<svg viewBox='0 0 24 40'><line x1='12' y1='2' x2='12' y2='30' stroke='currentColor' stroke-width='1.5'/><path d='M6 25 L12 34 L18 25' fill='none' stroke='currentColor' stroke-width='1.5'/></svg>" />
+
+  <Card tone="ok" on:event={{ click: "state.set('stage', 'db')" }}>
+    <Heading level={3}>Database</Heading>
+    <Text tone="subtle">Persists orders and decrements inventory in one transaction</Text>
+  </Card>
+
+  {/* The detail panel - one local variable drives which explanation shows. */}
+  <Card gap="2">
+    <Empty if:show="stage == ''">Select a stage above to inspect it.</Empty>
+    <Stack if:show="stage == 'browser'" gap="1">
+      <Heading level={3}>At the browser</Heading>
+      <Text>The cart lives in local state until checkout. The only thing that leaves the device is the final <Code>POST /api/checkout</Code> - everything before it is a read.</Text>
+    </Stack>
+    <Stack if:show="stage == 'edge'" gap="1">
+      <Heading level={3}>At the edge</Heading>
+      <Text>Static assets are cached here and never touch your origin. A cache hit on <Code>/product-1.jpg</Code> is the difference between 12 ms and 120 ms.</Text>
+    </Stack>
+    <Stack if:show="stage == 'gateway'" gap="1">
+      <Heading level={3}>At the gateway</Heading>
+      <Text>The token is verified once, here, and the trusted claims are passed inward. Rate limits are enforced before any service does work - the cheapest place to shed load.</Text>
+    </Stack>
+    <Stack if:show="stage == 'services'" gap="1">
+      <Heading level={3}>In the services</Heading>
+      <Text>Checkout calls product for price, cart for contents, then payment. This chain is serial - each call waits on the last - which is why the tail of the load is the place to optimize.</Text>
+    </Stack>
+    <Stack if:show="stage == 'db'" gap="1">
+      <Heading level={3}>At the database</Heading>
+      <Text>Order insert and inventory decrement happen in one transaction, so a payment can never succeed against stock that was already sold.</Text>
+    </Stack>
+  </Card>
+
+</Stack>
+```

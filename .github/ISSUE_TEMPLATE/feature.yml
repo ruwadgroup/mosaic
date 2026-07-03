@@ -1,0 +1,43 @@
+name: Feature / preset / primitive request
+description: A new preset, primitive, directive, renderer, or improvement.
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - New preset
+        - New primitive
+        - New directive
+        - New renderer (host or surface)
+        - Improvement to existing
+        - Tooling / DX
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: Proposed shape
+      description: |
+        What does the tag / API look like? Use Mosaic JSX where it fits.
+      placeholder: |
+        ```mosaic
+        <Receipt items={...} total="$42.10" />
+        ```
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why
+      description: |
+        Why is this worth adding to the registry? What category of artifacts does it unlock?
+
+  - type: textarea
+    id: decompose
+    attributes:
+      label: decomposeTo (presets only)
+      description: |
+        If proposing a preset, sketch how it decomposes into existing primitives for Tier-0 fallback.

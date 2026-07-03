@@ -1,0 +1,50 @@
+```mosaic v=1 id=model-compare
+<Stack gap="4" state={{ priority: "Quality" }}>
+  {/* The pick-a-model artifact: an opinionated comparison where the
+      recommendation is a function of what you optimize for. Flip the
+      priority and the badge, the verdict, and the button label all
+      re-derive from the same choice - what you click is what runs. */}
+
+  <Stack gap="1">
+    <Heading>Which model should run this refactor</Heading>
+    <Text tone="subtle">
+      The session-store refactor touches 12 call sites across 5 files. Scored on this codebase, not on public benchmarks.
+    </Text>
+  </Stack>
+
+  <DataTable
+    columns={["Model", "Cost / 1M tokens", "p50 first token", "On this kind of work"]}
+    rows={[
+      ["claude-fable-5",  "$16.50", "2.8s", "Strongest on cross-file refactors; catches API drift the others miss"],
+      ["claude-opus-4.8", "$12.00", "2.4s", "Close second on quality; edits run conservative"],
+      ["claude-sonnet-5", "$2.40",  "1.1s", "Fastest here; fine for mechanical stages, misses subtle coupling"],
+      ["gpt-5.5",         "$1.20",  "2.1s", "Best value by far; wants an explicit file map for this repo"]
+    ]} />
+
+  <Field label="What matters most for this run">
+    <SegmentedControl bind:state="priority" options={["Quality", "Cost", "Speed"]} />
+  </Field>
+
+  <Card gap="2">
+    <Stack direction="horizontal" gap="2">
+      <Badge tone="ok">
+        {expr("concat('recommended: ', priority == 'Quality' ? 'claude-fable-5' : priority == 'Cost' ? 'gpt-5.5' : 'claude-sonnet-5')")}
+      </Badge>
+      <Tag>{expr("concat('optimizing for ', lower(priority))")}</Tag>
+    </Stack>
+    <Text>
+      {expr("priority == 'Quality' ? 'This refactor is exactly where cheaper models slip: the 12 call sites look identical, but three carry await-ordering that matters. fable-5 is the only one here I would let run it unattended.' : priority == 'Cost' ? 'gpt-5.5 at $1.20 per 1M is nearly 14x cheaper than fable-5. Hand it the file map up front and review the diff before committing - the risk is coupling it cannot see, not syntax.' : 'sonnet-5 streams edits at about half the latency of anything else here. Run it stage by stage and keep the migration file out of its batch.'")}
+    </Text>
+  </Card>
+
+  <Button
+    tone="primary"
+    on:event={{ click: { action: "selectModel", args: {
+      model: expr("priority == 'Quality' ? 'claude-fable-5' : priority == 'Cost' ? 'gpt-5.5' : 'claude-sonnet-5'"),
+      priority: expr("priority")
+    } } }}>
+    {expr("concat('Use ', priority == 'Quality' ? 'claude-fable-5' : priority == 'Cost' ? 'gpt-5.5' : 'claude-sonnet-5')")}
+  </Button>
+
+</Stack>
+```

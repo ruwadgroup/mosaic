@@ -1,0 +1,173 @@
+{
+  "$id": "https://mosaic.dev/spec/v1/primitives.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mosaic Blocks v1 (sketch)",
+  "description": "Per-block sub-schemas constraining props. The general building-block catalog (docs/proposal.md §4). Every block is a general shape - no domain templates. Sketch only; fills in as the registry stabilizes.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "_layout": { "const": "Box, Stack, Grid, Divider" },
+    "Box": { "type": "object" },
+    "Stack": { "type": "object" },
+    "Grid": {
+      "type": "object",
+      "description": "12-column track model with named areas. The bespoke-layout workhorse."
+    },
+    "Divider": { "type": "object" },
+
+    "_content": {
+      "const": "Text, Heading, Markdown, Image, Icon, Link, Badge, Tag, Avatar, Code, Callout, Card"
+    },
+    "Text": { "type": "object" },
+    "Heading": { "type": "object" },
+    "Markdown": { "type": "object", "description": "Sanitized prose block. No HTML passthrough." },
+    "Image": {
+      "type": "object",
+      "properties": {
+        "props": {
+          "type": "object",
+          "required": ["src", "alt"],
+          "properties": {
+            "src": { "type": "string" },
+            "alt": {
+              "type": "string",
+              "minLength": 1,
+              "description": "REQUIRED. Validation fails without it. See docs/proposal.md §4.1."
+            },
+            "aspect": { "type": "string" }
+          }
+        }
+      }
+    },
+    "Icon": { "type": "object" },
+    "Link": { "type": "object" },
+    "Badge": { "type": "object" },
+    "Tag": { "type": "object", "description": "Removable label/chip." },
+    "Avatar": { "type": "object", "description": "Entity image/initials; group via children." },
+    "Code": { "type": "object" },
+    "Callout": {
+      "type": "object",
+      "description": "Inline info/warn/error notice; tone from the theme."
+    },
+    "Card": {
+      "type": "object",
+      "description": "A themed surface (padding, radius, border from the theme)."
+    },
+
+    "_controls": {
+      "const": "Button, Input, Select, MultiSelect, Autocomplete, Checkbox, Radio, Toggle, Slider, DatePicker, ColorPicker, FilePicker, Rating, TagInput, Field, Disclosure, Accordion"
+    },
+    "Button": { "type": "object" },
+    "Input": {
+      "type": "object",
+      "description": "type = text | number | email | password | textarea | search."
+    },
+    "Select": { "type": "object", "description": "Single choice over a fixed option set." },
+    "MultiSelect": {
+      "type": "object",
+      "description": "Multiple choices over a fixed option set; bind:state holds an array."
+    },
+    "Autocomplete": {
+      "type": "object",
+      "description": "Type-ahead over baked-in options; filtering is local, no data-pull."
+    },
+    "Checkbox": { "type": "object" },
+    "Radio": { "type": "object" },
+    "Toggle": { "type": "object" },
+    "Slider": {
+      "type": "object",
+      "description": "Numeric range; supports a range variant. bind:state for the value."
+    },
+    "DatePicker": { "type": "object" },
+    "ColorPicker": { "type": "object" },
+    "FilePicker": { "type": "object" },
+    "Rating": { "type": "object" },
+    "TagInput": { "type": "object" },
+    "Field": {
+      "type": "object",
+      "description": "Label + control + help + error wrapper. The form workhorse."
+    },
+    "Disclosure": { "type": "object", "description": "One collapsible section." },
+    "Accordion": { "type": "object", "description": "A set of Disclosures." },
+
+    "_structure": { "const": "Tabs, Steps, SegmentedControl, Progress, Empty" },
+    "Tabs": {
+      "type": "object",
+      "description": "items = tab labels; active = default tab (label or index); one child panel per item; variant = pill | underline. bind:state to drive from state."
+    },
+    "Steps": { "type": "object", "description": "Ordered progress/wizard steps." },
+    "SegmentedControl": { "type": "object" },
+    "Progress": {
+      "type": "object",
+      "description": "Linear or circular completion indicator (a value, not a loading spinner)."
+    },
+    "Empty": { "type": "object", "description": "Empty-state placeholder." },
+
+    "_media": { "const": "Video, Audio, Carousel" },
+    "Video": { "type": "object", "description": "Requires alt/caption." },
+    "Audio": { "type": "object" },
+    "Carousel": { "type": "object" },
+
+    "_dataviz": {
+      "const": "DataTable, List, Tree, Board, Timeline, Calendar, Stat, Chart, VegaChart, Canvas, Embed"
+    },
+    "DataTable": {
+      "type": "object",
+      "description": "Sortable/filterable/paginated columns + rows. Data in prop-arrays (rows/columns), not cell nodes."
+    },
+    "List": {
+      "type": "object",
+      "description": "Itemized/virtualizable list with a row template. Covers key-value and feeds."
+    },
+    "Tree": {
+      "type": "object",
+      "description": "General hierarchy - file trees, org charts, module maps."
+    },
+    "Board": {
+      "type": "object",
+      "description": "Columns of cards, optional sortable. Kanban/triage/pipeline are instances."
+    },
+    "Timeline": { "type": "object", "description": "Ordered dated/sequenced items with tone." },
+    "Calendar": { "type": "object", "description": "Month/week/day grid of dated items." },
+    "Stat": { "type": "object", "description": "Big number + label + delta + optional trend." },
+    "Chart": {
+      "type": "object",
+      "description": "One chart. type selects the shape; data in prop-arrays. alt required.",
+      "properties": {
+        "props": {
+          "type": "object",
+          "required": ["type", "alt"],
+          "properties": {
+            "type": {
+              "enum": [
+                "line",
+                "area",
+                "bar",
+                "donut",
+                "radar",
+                "gauge",
+                "scatter",
+                "heatmap",
+                "sankey",
+                "sparkline"
+              ]
+            },
+            "alt": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "VegaChart": {
+      "type": "object",
+      "description": "Full Vega-Lite v5 spec as inline JSON literal. A grammar, not a fixed set. Spec is data, not code. alt required."
+    },
+    "Canvas": {
+      "type": "object",
+      "description": "Inline sanitized SVG (svg prop) for bespoke diagrams. Data is in the artifact. alt required."
+    },
+    "Embed": {
+      "type": "object",
+      "description": "Escape hatch. Default permission: deny. See docs/proposal.md §8."
+    }
+  }
+}

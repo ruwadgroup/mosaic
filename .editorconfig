@@ -1,0 +1,49 @@
+# EditorConfig — https://editorconfig.org
+# Cross-language baseline. Language-specific tools (Biome, SwiftFormat, ktlint,
+# dart format) take it from here.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+# Markdown — trailing whitespace can be meaningful (line break)
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# Makefiles need real tabs
+[{Makefile,makefile,GNUmakefile,*.mk}]
+indent_style = tab
+
+# Go follows gofmt
+[*.go]
+indent_style = tab
+
+# Python — PEP 8
+[*.{py,pyi}]
+indent_size = 4
+
+# Kotlin — ktlint default is 4 spaces
+[*.{kt,kts}]
+indent_size = 4
+
+# Dart — dart format default is 2 (already covered above) but be explicit
+[*.dart]
+indent_size = 2
+
+# Swift — SwiftFormat default is 4 spaces
+[*.swift]
+indent_size = 4
+
+# Gradle wrapper jar etc. — leave alone
+[gradle/wrapper/*]
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

@@ -1,0 +1,154 @@
+```mosaic v=1 id=customer-details
+<Stack gap="4" state={{
+    txFilter: "All",
+    note: "",
+    txns: [
+      { ref: "TX-90112", dir: "in",  amount: 184000, cpty: "Al Rashid Exchange",   date: "Jun 28", flagged: true,  reason: "structuring pattern" },
+      { ref: "TX-90084", dir: "out", amount: 92500,  cpty: "Meridian Logistics SA", date: "Jun 26", flagged: false, reason: "" },
+      { ref: "TX-89971", dir: "in",  amount: 9800,   cpty: "Cash deposit - DXB",    date: "Jun 24", flagged: true,  reason: "just under reporting threshold" },
+      { ref: "TX-89907", dir: "in",  amount: 9700,   cpty: "Cash deposit - DXB",    date: "Jun 23", flagged: true,  reason: "just under reporting threshold" },
+      { ref: "TX-89812", dir: "out", amount: 41200,  cpty: "Horizon Freight LLC",   date: "Jun 19", flagged: false, reason: "" },
+      { ref: "TX-89644", dir: "in",  amount: 230000, cpty: "Meridian Holdings Ltd", date: "Jun 12", flagged: false, reason: "" }
+    ]
+  }}>
+  {/* Mock the customer-details screen before anyone builds it: header with the
+      risk posture, derived counters over baked-in transactions, a filterable
+      ledger, screening hits, and an escalation that hands the host the whole
+      picture as one intent. Domain shapes from the nexaml AML console. */}
+
+  <Stack direction="horizontal" gap="3">
+    <Avatar name="Meridian Trading FZE" />
+    <Stack gap="1">
+      <Stack direction="horizontal" gap="2">
+        <Heading level={2}>Meridian Trading FZE</Heading>
+        <Badge tone="bad">high risk</Badge>
+        <Badge tone="warn">PEP-linked</Badge>
+        <Badge>legal entity</Badge>
+      </Stack>
+      <Text tone="subtle">CUS-2841 · Free-zone trading company, Dubai, AE · Customer since Nov 2024 · Lifecycle: periodic review</Text>
+    </Stack>
+  </Stack>
+
+  <Grid cols={12} gap="3">
+    <Stat slot:name="a" label="Risk score" value="78 / 100" tone="bad" />
+    <Stat slot:name="b" label="Transactions (90d)" value={expr("count(txns)")} />
+    <Stat slot:name="c" label="Flagged" value={expr("count(filter(txns, t, t.flagged))")} tone="warn" />
+    <Stat slot:name="d" label="Next KYC review" value="Jul 15" />
+  </Grid>
+
+  <Tabs active="Overview" items={["Overview", "Transactions", "Screening", "Notes"]}>
+
+    <Grid cols={12} gap="3">
+      <Card slot:name="profile" gap="2">
+        <Heading level={3}>Profile</Heading>
+        <DataTable
+          columns={["Field", "Value"]}
+          rows={[
+            ["Kind",                 "Legal entity (free-zone FZE)"],
+            ["Status",               "Active"],
+            ["Incorporated",         "Nov 2019 · DMCC, Dubai"],
+            ["Industry",             "General trading - electronics re-export"],
+            ["UBO",                  "K. Al Mansoori (68%) - PEP relative"],
+            ["Relationship manager", "@fatima"],
+            ["Expected volume",      "$150k - 400k / month"]
+          ]} />
+      </Card>
+      <Card slot:name="risk" gap="2">
+        <Heading level={3}>Risk trend</Heading>
+        <Chart
+          type="bar"
+          alt="Quarterly risk score: 54 in Q3, 61 in Q4, 70 in Q1, 78 in Q2 - rising for a year."
+          series={[{ name: "Risk score", points: [["Q3", 54], ["Q4", 61], ["Q1", 70], ["Q2", 78]] }]} />
+        <Callout tone="warn">
+          Score has risen four quarters straight. Drivers: cash-intensive counterparties, UBO PEP link, and two structuring flags this month.
+        </Callout>
+      </Card>
+    </Grid>
+
+    <Stack gap="3">
+      <Stack direction="horizontal" gap="3">
+        <SegmentedControl bind:state="txFilter" options={["All", "Incoming", "Flagged"]} />
+        <Text tone="subtle">
+          {expr("concat('Showing ', count(filter(txns, t, txFilter == 'All' || (txFilter == 'Incoming' && t.dir == 'in') || (txFilter == 'Flagged' && t.flagged))), ' of ', count(txns), ' · flagged total ', formatCurrency(sum(map(filter(txns, t, t.flagged), t, t.amount))))")}
+        </Text>
+      </Stack>
+      <List for:each="filter(txns, t, txFilter == 'All' || (txFilter == 'Incoming' && t.dir == 'in') || (txFilter == 'Flagged' && t.flagged)) as tx">
+        <Card key={expr("tx.ref")} gap="1">
+          <Stack direction="horizontal" gap="2">
+            <Badge tone={expr("tx.flagged ? 'bad' : tx.dir == 'in' ? 'ok' : 'subtle'")}>
+              {expr("tx.flagged ? 'flagged' : tx.dir == 'in' ? 'in' : 'out'")}
+            </Badge>
+            <Text weight="bold">{expr("formatCurrency(tx.amount)")}</Text>
+            <Text tone="subtle">{expr("concat(tx.ref, ' · ', tx.cpty, ' · ', tx.date)")}</Text>
+          </Stack>
+          <Text if:show="tx.flagged" tone="warn">{expr("tx.reason")}</Text>
+        </Card>
+      </List>
+    </Stack>
+
+    <Stack gap="3">
+      <Card gap="2">
+        <Stack direction="horizontal" gap="2">
+          <Heading level={3}>Sanctions screening</Heading>
+          <Badge tone="warn">possible match</Badge>
+        </Stack>
+        <Text>"Meridian Trading" - 82% name similarity against OFAC SDN entry #48122 (Meridian Trading Co, IR). Different jurisdiction and incorporation date; likely a false positive, unresolved for 12 days.</Text>
+        <Stack direction="horizontal" gap="2">
+          <Tag>OFAC SDN</Tag><Tag>name match 82%</Tag><Tag>hold: sanctions_match</Tag>
+        </Stack>
+      </Card>
+      <Card gap="2">
+        <Stack direction="horizontal" gap="2">
+          <Heading level={3}>PEP review</Heading>
+          <Badge tone="warn">open</Badge>
+        </Stack>
+        <Text>UBO is the nephew of a serving GCC transport minister. Relationship documented at onboarding; enhanced due diligence renewal is part of the Jul 15 periodic review.</Text>
+      </Card>
+      <Card gap="2">
+        <Stack direction="horizontal" gap="2">
+          <Heading level={3}>Adverse media</Heading>
+          <Badge tone="ok">clear</Badge>
+        </Stack>
+        <Text tone="subtle">No adverse coverage in the last 24 months across 3 providers.</Text>
+      </Card>
+    </Stack>
+
+    <Stack gap="3">
+      <Timeline items={[
+        { date: "Jun 28", title: "TX-90112 flagged: structuring pattern across 3 deposits", tone: "bad" },
+        { date: "Jun 24", title: "Two cash deposits just under the AED 40k reporting threshold", tone: "warn" },
+        { date: "Jun 15", title: "Periodic review scheduled for Jul 15 (EDD renewal)", tone: "ok" },
+        { date: "May 30", title: "Sanctions screening hit #48122 marked 'under review' by @fatima", tone: "warn" },
+        { date: "May 02", title: "Risk score raised 70 → 78 (quarterly measurement)", tone: "bad" }
+      ]} />
+      <Field label="Add a note">
+        <Input type="text" bind:state="note" placeholder="Visible to the compliance team, appended to the audit trail" />
+      </Field>
+      <Button on:event={{ click: { action: "addNote", args: { customer: "CUS-2841", body: expr("note") } } }}>
+        Add note
+      </Button>
+    </Stack>
+
+  </Tabs>
+
+  <Divider />
+
+  <Stack direction="horizontal" gap="2">
+    <Button
+      tone="primary"
+      on:event={{ click: { action: "escalateToCase", args: {
+        customer: "CUS-2841",
+        riskScore: 78,
+        flaggedCount: expr("count(filter(txns, t, t.flagged))"),
+        flaggedTotal: expr("sum(map(filter(txns, t, t.flagged), t, t.amount))"),
+        openHolds: ["sanctions_match", "pep_review"]
+      } } }}>
+      {expr("concat('Escalate to case (', count(filter(txns, t, t.flagged)), ' flagged, ', formatCurrency(sum(map(filter(txns, t, t.flagged), t, t.amount))), ')')")}
+    </Button>
+    <Button on:event={{ click: { action: "requestKyc", args: { customer: "CUS-2841" } } }}>
+      Request updated KYC
+    </Button>
+  </Stack>
+
+</Stack>
+```

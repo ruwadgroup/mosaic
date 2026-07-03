@@ -1,0 +1,60 @@
+{
+  "$id": "https://mosaic.dev/spec/v1/host-manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mosaic Host Manifest v1",
+  "description": "What a host publishes so models can target it accurately: capabilities and policy, never design. The host's renderer draws every component; semantic token names are standardized by Mosaic and token values never travel. See docs/proposal.md §3.3.",
+  "type": "object",
+  "required": [
+    "mosaic_version",
+    "interactive",
+    "graphics",
+    "components_supported",
+    "directives_supported"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "mosaic_version": { "const": "1.0" },
+    "interactive": {
+      "type": "boolean",
+      "description": "Whether the renderer honors local interactivity (bind:state, on:event). A static surface (email, plain text) sets false and renders controls in their default state."
+    },
+    "graphics": {
+      "enum": ["none", "static", "rich"],
+      "description": "How much of the visual model the renderer can draw. none = alt text only; static = images/charts, no interaction; rich = full."
+    },
+    "components_supported": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Rich components the renderer draws natively (DataTable, Chart, Tree, Board, …). Unsupported ones fall back through decomposeTo."
+    },
+    "components_unsupported": { "type": "array", "items": { "type": "string" } },
+    "directives_supported": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "bind:state",
+          "from:state",
+          "from:expr",
+          "if:show",
+          "for:each",
+          "on:event",
+          "theme:scope",
+          "slot:name",
+          "key",
+          "from:ref"
+        ]
+      }
+    },
+    "directives_unsupported": { "type": "array", "items": { "type": "string" } },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": { "enum": ["allow", "deny", "user-consent"] },
+      "description": "Host policy on gated blocks (e.g. Embed). Defaults are conservative; Embed defaults to deny."
+    },
+    "strict": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, unknown tags and missing required props fail validation rather than rendering as a debug Box."
+    }
+  }
+}

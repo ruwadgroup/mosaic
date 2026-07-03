@@ -1,0 +1,84 @@
+```mosaic v=1 id=review-changes
+<Stack gap="4" state={{
+    f1: true, f2: true, f3: true, f4: true, f5: true,
+    files: [
+      { path: "src/stores/session.ts",           adds: 96, dels: 41, risk: "low" },
+      { path: "src/stores/atoms.ts",             adds: 58, dels: 0,  risk: "new" },
+      { path: "src/hooks/useSession.ts",         adds: 31, dels: 28, risk: "low" },
+      { path: "src/routes/_chat.tsx",            adds: 18, dels: 12, risk: "low" },
+      { path: "db/migrations/0042_sessions.sql", adds: 11, dels: 6,  risk: "schema" }
+    ]
+  }}>
+  {/* The diff-review artifact: the agent finished a refactor and hands over the
+      call. The stats fold over the same file list the rows come from, and the
+      commit button label, count, and intent args all derive from the checkbox
+      state - untick a file and everything re-agrees instantly. */}
+
+  <Stack direction="horizontal" gap="2">
+    <Heading level={2}>Changes ready for review</Heading>
+    <Badge>{expr("concat(count(files), ' files')")}</Badge>
+    <Badge tone="warn">{expr("concat(count(filter(files, f, f.risk == 'schema')), ' needs attention')")}</Badge>
+  </Stack>
+
+  <Grid cols={12} gap="3">
+    <Stat slot:name="a" label="additions" value={expr("concat('+', sum(map(files, f, f.adds)))")} tone="ok" />
+    <Stat slot:name="b" label="deletions" value={expr("concat('-', sum(map(files, f, f.dels)))")} tone="bad" />
+    <Stat slot:name="c" label="migration touched" value={expr("count(filter(files, f, f.risk == 'schema'))")} tone="warn" />
+  </Grid>
+
+  <Stack gap="2">
+    <Stack direction="horizontal" gap="2">
+      <Checkbox bind:state="f1" label="src/stores/session.ts" />
+      <Text tone="ok">+96</Text>
+      <Text tone="bad">-41</Text>
+      <Badge tone="ok">low</Badge>
+    </Stack>
+    <Stack direction="horizontal" gap="2">
+      <Checkbox bind:state="f2" label="src/stores/atoms.ts" />
+      <Text tone="ok">+58</Text>
+      <Text tone="bad">-0</Text>
+      <Badge tone="ok">new</Badge>
+    </Stack>
+    <Stack direction="horizontal" gap="2">
+      <Checkbox bind:state="f3" label="src/hooks/useSession.ts" />
+      <Text tone="ok">+31</Text>
+      <Text tone="bad">-28</Text>
+      <Badge tone="ok">low</Badge>
+    </Stack>
+    <Stack direction="horizontal" gap="2">
+      <Checkbox bind:state="f4" label="src/routes/_chat.tsx" />
+      <Text tone="ok">+18</Text>
+      <Text tone="bad">-12</Text>
+      <Badge tone="ok">low</Badge>
+    </Stack>
+    <Stack direction="horizontal" gap="2">
+      <Checkbox bind:state="f5" label="db/migrations/0042_sessions.sql" />
+      <Text tone="ok">+11</Text>
+      <Text tone="bad">-6</Text>
+      <Badge tone="warn">schema</Badge>
+    </Stack>
+  </Stack>
+
+  <Callout if:show="f5" tone="warn">
+    0042_sessions.sql alters the sessions table. It is safe to run twice, but review the DEFAULT change on last_seen_at before it ships.
+  </Callout>
+
+  <Stack direction="horizontal" gap="2">
+    <Button
+      tone="primary"
+      on:event={{ click: { action: "commit", args: {
+        files: expr("sum(map([f1, f2, f3, f4, f5], c, c ? 1 : 0))"),
+        branch: "mosaic/effect-atoms"
+      } } }}>
+      {expr("concat('Commit ', sum(map([f1, f2, f3, f4, f5], c, c ? 1 : 0)), ' files (+', sum([f1 ? 96 : 0, f2 ? 58 : 0, f3 ? 31 : 0, f4 ? 18 : 0, f5 ? 11 : 0]), ' -', sum([f1 ? 41 : 0, 0, f3 ? 28 : 0, f4 ? 12 : 0, f5 ? 6 : 0]), ')')")}
+    </Button>
+    <Button on:event={{ click: { action: "openDiff", args: { branch: "mosaic/effect-atoms" } } }}>
+      Open full diff
+    </Button>
+    <Button tone="subtle" on:event={{ click: { action: "discardAll", args: { branch: "mosaic/effect-atoms" } } }}>
+      Discard all
+    </Button>
+  </Stack>
+
+</Stack>
+```

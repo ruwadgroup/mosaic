@@ -1,0 +1,53 @@
+name: Spec
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "schema/**"
+      - "specs/**"
+      - ".github/workflows/spec.yml"
+  pull_request:
+    paths:
+      - "schema/**"
+      - "specs/**"
+
+permissions:
+  contents: read
+
+jobs:
+  schema-validate:
+    name: JSON Schema sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install ajv-cli
+        run: npm install -g ajv-cli@5
+
+      - name: Validate schemas compile
+        run: |
+          ajv compile -s schema/mosaic-v1.schema.json
+          ajv compile -s schema/host-manifest.schema.json
+          ajv compile -s schema/primitives.schema.json
+
+  markdown-lint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: |
+            specs/**/*.md
+            docs/**/*.md
+            .github/*.md
+            README.md
+            ARCHITECTURE.md
+            ROADMAP.md
+            CHANGELOG.md

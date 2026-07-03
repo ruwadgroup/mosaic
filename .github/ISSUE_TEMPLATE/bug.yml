@@ -1,0 +1,48 @@
+name: Implementation bug
+description: A bug in one of the reference implementations (parser, validator, renderer, emitter).
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - "@mosaic/core"
+        - "@mosaic/react"
+        - "@mosaic/mcp"
+        - "@mosaic/ansi"
+        - schema/ (JSON Schemas)
+        - tools/
+        - other / unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: |
+        A minimal Mosaic document, command, or code snippet that triggers the bug. Smaller is better.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Package version or commit SHA.

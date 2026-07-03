@@ -1,0 +1,132 @@
+{
+  "$id": "https://mosaic.dev/spec/v1/mosaic.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mosaic Document v1",
+  "description": "Canonical JSON form of a Mosaic document (mosaic-json). See docs/proposal.md, §3.",
+  "type": "object",
+  "required": ["mosaic_version", "id", "root"],
+  "additionalProperties": false,
+  "properties": {
+    "mosaic_version": {
+      "const": "1.0",
+      "description": "Pins the document to a spec version. Renderers validate against the version they support."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$",
+      "description": "Stable cross-regeneration identity. Matches the id= in the mosaic-jsx fence opener."
+    },
+    "root": { "$ref": "#/$defs/Node" },
+    "refs": {
+      "type": "object",
+      "description": "Hoisted reusable subtrees. Referenced from descendants via directives.from:ref.",
+      "additionalProperties": { "$ref": "#/$defs/Node" }
+    }
+  },
+  "$defs": {
+    "Node": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": ["primitive", "component", "text"],
+          "description": "Optional discriminator. Resolved from the registry by type if omitted."
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]+$",
+          "description": "PascalCase tag (Box, Card, Chart, …). Lowercase HTML tag names are rejected at parse time."
+        },
+        "props": {
+          "type": "object",
+          "description": "Validated against the per-type sub-schema in primitives.schema.json.",
+          "additionalProperties": { "$ref": "#/$defs/JsonLiteral" }
+        },
+        "directives": { "$ref": "#/$defs/Directives" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Node" }
+        },
+        "slots": {
+          "type": "object",
+          "description": "Named child collections, indexed by slot name (e.g. Stat.trend, Disclosure.body).",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/Node" }
+          }
+        },
+        "key": {
+          "type": "string",
+          "description": "Stable identity for list-child diffing. Models are coached to set this on repeating items."
+        }
+      }
+    },
+    "Directives": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bind:state": {
+          "type": "string",
+          "description": "Two-way bind, dotted path (e.g. 'filters.region')."
+        },
+        "from:state": { "type": "string", "description": "Read-only bind, dotted path." },
+        "from:expr": {
+          "type": "string",
+          "description": "Derived value: a bounded expr(...) expression that recomputes when its inputs change. See docs/proposal.md §6.2."
+        },
+        "if:show": {
+          "type": "string",
+          "description": "Conditional render: a boolean expr(...) expression."
+        },
+        "for:each": {
+          "type": "string",
+          "description": "Repeater over a baked-in array, e.g. \"filter(rows, r, r.price > minPrice) as row\". The child subtree is instantiated once per item."
+        },
+        "on:event": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/ActionRef" },
+          "description": "Event-name → action map (local state.* mutation or a named host intent). Permitted events per block are registry-defined."
+        },
+        "theme:scope": { "type": "string" },
+        "slot:name": { "type": "string" },
+        "from:ref": {
+          "type": "string",
+          "description": "Inlines a subtree from the document's refs table."
+        }
+      }
+    },
+    "ActionRef": {
+      "description": "Either a local state mutation (state.set / state.toggle, applied by Mosaic) or a host action - a named intent the host interprets (call a tool, ask the model, navigate). Mosaic never acts on a host action itself.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Shorthand, e.g. \"state.toggle('open')\" or a host action name."
+        },
+        {
+          "type": "object",
+          "required": ["action"],
+          "additionalProperties": false,
+          "properties": {
+            "action": { "type": "string" },
+            "args": { "$ref": "#/$defs/JsonLiteral" }
+          }
+        }
+      ]
+    },
+    "JsonLiteral": {
+      "description": "Anything JSON-compatible, plus the special { \"$token\": \"color.bg\" } form for host-token references.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "type": "array", "items": { "$ref": "#/$defs/JsonLiteral" } },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/JsonLiteral" }
+        }
+      ]
+    }
+  }
+}

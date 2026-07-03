@@ -1,0 +1,51 @@
+# Normalize line endings on commit
+* text=auto eol=lf
+
+# Binaries — never touch
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.avif  binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.tar   binary
+*.gz    binary
+*.bz2   binary
+*.7z    binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.mp3   binary
+*.mp4   binary
+*.mov   binary
+
+# Source — explicit LF
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.swift text eol=lf
+*.kt    text eol=lf
+*.kts   text eol=lf
+*.dart  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.toml  text eol=lf
+
+# Lockfiles — managed by tools
+pnpm-lock.yaml         linguist-generated=true -diff
+package-lock.json      linguist-generated=true -diff
+yarn.lock              linguist-generated=true -diff
+bun.lockb              linguist-generated=true -diff binary
+Package.resolved       linguist-generated=true -diff
+gradle/wrapper/gradle-wrapper.properties linguist-generated=true
+pubspec.lock           linguist-generated=true -diff
+
+# Mosaic files render as JSX in GitHub
+*.mosaic linguist-language=JSX

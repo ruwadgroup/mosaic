@@ -1,0 +1,47 @@
+{
+  "name": "mosaic-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Mosaic \u2014 a clean-sheet output format for AI systems. Spec, reference impls, examples.",
+  "author": {
+    "name": "Tamim Bin Hakim",
+    "email": "tamimbinhakim.work@gmail.com",
+    "url": "https://github.com/tamimbinhakim"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tamimbinhakim/mosaic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tamimbinhakim/mosaic/issues"
+  },
+  "homepage": "https://github.com/tamimbinhakim/mosaic#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "pnpm -r --filter=\"./packages/ts/**\" run build",
+    "demo": "pnpm --filter @mosaic/demo dev",
+    "test": "vitest run",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "typecheck": "pnpm -r --filter=\"./packages/ts/**\" run typecheck",
+    "clean": "pnpm -r --filter=\"./packages/ts/**\" run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@changesets/cli": "^2.27.9",
+    "@types/node": "^22.7.5",
+    "lefthook": "^1.7.18",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.2"
+  },
+  "workspaces": ["packages/ts/*", "tools"]
+}

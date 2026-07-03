@@ -1,0 +1,101 @@
+```mosaic v=1 id=spec-review
+<Stack gap="4" state={{ hv1: false, hv2: false, hv3: false, hv4: false, hv5: false }}>
+  {/* A spec, turned into something you can review at a glance: what already
+      exists vs what's dead wiring, the two parallel work units, the risk that
+      actually matters, and a live sign-off checklist. Approve hands the host
+      the decision with the check count baked in. Mocked from nexaml spec 033. */}
+
+  <Stack gap="1">
+    <Stack direction="horizontal" gap="2">
+      <Badge>033</Badge>
+      <Badge tone="ok">ready</Badge>
+      <Badge tone="warn">P1</Badge>
+      <Tag>effort M</Tag>
+    </Stack>
+    <Heading>@mentions in comments</Heading>
+    <Text tone="subtle">Loop a teammate (or, later, the AI colleague) into any thread. Foundation for spec 034 - Nexa is summoned by the same @ gesture.</Text>
+  </Stack>
+
+  <Grid cols={12} gap="3">
+    <Stat slot:name="a" label="Work units" value="2 parallel" />
+    <Stat slot:name="b" label="Automated checks" value="9" />
+    <Stat slot:name="c" label="Schema migrations" value="0" tone="ok" />
+    <Stat slot:name="d" label="Depends on" value="nothing" />
+  </Grid>
+
+  <Callout tone="warn">
+    Comment creation is a hot, regulator-visible path with an existing DLP/PII scan.
+    Mitigation: validate mention ids against org membership, fan out only after commit, reuse the proven notify_watchers pattern.
+  </Callout>
+
+  <Card gap="2">
+    <Heading level={3}>Half-built, then abandoned</Heading>
+    <Text tone="subtle">The scaffolding exists end to end; nothing is wired. This spec finishes the wiring - no migration needed.</Text>
+    <DataTable
+      columns={["Piece", "State", "Where"]}
+      rows={[
+        ["Comment.mentions column",        "exists", "db/inbox.py"],
+        ["NotificationKind.MENTIONED",     "exists", "kinds, bell icon, 5 locales"],
+        ["Composers send mentions",        "dead - hardcoded []", "all three composers"],
+        ["Routes parse mentions",          "dead - stored verbatim", "routes/(org)/comments.py"],
+        ["MENTIONED notification created", "missing entirely", "tasks/notifications.py"]
+      ]} />
+  </Card>
+
+  <Tabs active="Backend" items={["Backend", "Frontend", "Sign-off"]}>
+
+    <Card gap="2">
+      <Timeline items={[
+        { date: "A1", title: "notify_mentioned task - mirror notify_watchers, dedup per comment:user", tone: "ok" },
+        { date: "A2", title: "Validate mentions on create: UUID + ACTIVE org membership, drop junk silently", tone: "ok" },
+        { date: "A3", title: "Fan out after commit; on edit, notify only newly added mentions", tone: "warn" },
+        { date: "A4", title: "Carry friendly @Name labels to the timeline display", tone: "ok" },
+        { date: "A5", title: "Regenerate the OpenAPI client", tone: "ok" }
+      ]} />
+      <Text tone="subtle">Enqueue after commit so a broker hiccup never rolls back the comment.</Text>
+    </Card>
+
+    <Card gap="2">
+      <Timeline items={[
+        { date: "B1", title: "Shared MentionComposer: @ typeahead over org members, arrow keys + Enter", tone: "ok" },
+        { date: "B2", title: "Replace all three textareas - cases, transactions, customers", tone: "ok" },
+        { date: "B3", title: "Emphasize @Name in the audit timeline (violet, presentational only)", tone: "ok" }
+      ]} />
+      <Text tone="subtle">Body stays human-readable @Name text - no raw UUIDs, ever.</Text>
+    </Card>
+
+    <Card gap="3">
+      <Text tone="subtle">The judgment calls a human confirms before this ships.</Text>
+      <Checkbox bind:state="hv1" label="@ opens the member picker on all three surfaces; picking notifies with the right context label" />
+      <Checkbox bind:state="hv2" label="Bell shows the mention with AtSign styling and links back to the thread" />
+      <Checkbox bind:state="hv3" label="Editing a comment notifies only newly added people" />
+      <Checkbox bind:state="hv4" label="@Name renders emphasized in the timeline; no raw UUIDs anywhere" />
+      <Checkbox bind:state="hv5" label="Notification preferences actually gate delivery" />
+      <Progress
+        label={expr("concat(sum(map([hv1, hv2, hv3, hv4, hv5], c, c ? 1 : 0)), ' of 5 confirmed')")}
+        value={expr("20 * sum(map([hv1, hv2, hv3, hv4, hv5], c, c ? 1 : 0))")} />
+    </Card>
+
+  </Tabs>
+
+  <Callout tone="bad">
+    STOP conditions: the cited files drifted since commit 8c7837d0 · a schema migration turns out to be needed · DLP/PII scan would have to change · the localization keys don't match.
+  </Callout>
+
+  <Stack direction="horizontal" gap="2">
+    <Button
+      tone="primary"
+      on:event={{ click: { action: "approveSpec", args: {
+        spec: "033-comment-mentions",
+        decision: "approve",
+        humanChecksConfirmed: expr("sum(map([hv1, hv2, hv3, hv4, hv5], c, c ? 1 : 0))")
+      } } }}>
+      {expr("concat('Approve spec (', sum(map([hv1, hv2, hv3, hv4, hv5], c, c ? 1 : 0)), '/5 checks)')")}
+    </Button>
+    <Button on:event={{ click: { action: "requestChanges", args: { spec: "033-comment-mentions" } } }}>
+      Request changes
+    </Button>
+  </Stack>
+
+</Stack>
+```

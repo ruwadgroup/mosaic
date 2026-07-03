@@ -1,0 +1,27 @@
+{
+  "name": "@mosaic/core",
+  "version": "0.0.0",
+  "description": "The Mosaic core: AST types, mosaic-jsx/mosaic-json parse + serialize, validate, resolve, the expr evaluator, walk(), the block registry, and the Host Manifest + theme.",
+  "license": "MIT",
+  "author": "Tamim Bin Hakim <tamimbinhakim.work@gmail.com>",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .tsbuildinfo"
+  },
+  "publishConfig": { "access": "public" }
+}

@@ -1,0 +1,92 @@
+# Demo app and local spec workflow (not committed yet)
+demo/
+.agents/
+
+# Node / TypeScript
+node_modules/
+*.tsbuildinfo
+.next/
+.turbo/
+dist/
+build/
+coverage/
+.nyc_output/
+.eslintcache
+.pnpm-store/
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+npm-debug.log*
+.bun/
+bun-debug.log*
+
+# Output of `vitest --coverage`
+coverage/
+
+# Generated docs
+docs/_site/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+packages/swift/**/Packages/
+Package.resolved
+
+# Kotlin / Gradle
+.gradle/
+local.properties
+*.iml
+.idea/
+out/
+.kotlin/
+build/
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+.packages
+
+# IDE
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+.zed/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Local environment
+.env
+.env.local
+.env.*.local
+.envrc
+
+# Tool caches
+.cache/
+.parcel-cache/
+.rollup.cache/
+.tsup/
+.vitest-cache/
+
+# Bake-off harness outputs
+tools/bakeoff/results/
+tools/bakeoff/runs/
+
+# Misc
+*.log
+*.pid
+*.seed
+*.pid.lock
