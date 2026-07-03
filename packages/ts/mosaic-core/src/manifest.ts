@@ -1,13 +1,11 @@
 // Host Manifest (docs/proposal.md §3.3) - capabilities and policy, never design.
 // The host's renderer draws every component; token values never travel.
 
-export type GraphicsLevel = 'none' | 'static' | 'rich';
 export type PermissionValue = 'allow' | 'deny' | 'user-consent';
 
 export type HostManifest = {
   mosaic_version: '1.0';
   interactive: boolean;
-  graphics: GraphicsLevel;
   components_supported: string[];
   components_unsupported?: string[];
   directives_supported: string[];
@@ -19,7 +17,6 @@ export type HostManifest = {
 export const DEFAULT_MANIFEST: HostManifest = {
   mosaic_version: '1.0',
   interactive: true,
-  graphics: 'rich',
   components_supported: [
     'DataTable',
     'List',
@@ -49,7 +46,7 @@ export const DEFAULT_MANIFEST: HostManifest = {
 /** The compact manifest form that lands in the model's system prompt. */
 export function compactManifest(m: HostManifest): string {
   const lines = [
-    `mosaic ${m.mosaic_version} · interactive=${m.interactive} · graphics=${m.graphics}`,
+    `mosaic ${m.mosaic_version} · interactive=${m.interactive}`,
     `components: ${m.components_supported.join(', ')}`,
     `directives: ${m.directives_supported.join(', ')}`,
   ];

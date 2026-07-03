@@ -41,7 +41,6 @@ const TONE_CODES: Record<string, string> = {
 const TEXT_MANIFEST: HostManifest = {
   ...DEFAULT_MANIFEST,
   interactive: false,
-  graphics: 'none',
   components_supported: ['DataTable', 'Timeline', 'Stat', 'List', 'Steps', 'Progress'],
 };
 

@@ -71,7 +71,7 @@ export {
   compactManifest,
   resolveToken,
 } from './manifest.js';
-export type { GraphicsLevel, HostManifest, PermissionValue, Theme } from './manifest.js';
+export type { HostManifest, PermissionValue, Theme } from './manifest.js';
 
 // --- parse / serialize ---------------------------------------------------------
 
