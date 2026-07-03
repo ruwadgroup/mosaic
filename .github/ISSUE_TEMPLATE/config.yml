@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question about Mosaic
-    url: https://github.com/tamimbinhakim/mosaic/discussions
+    url: https://github.com/ruwadgroup/mosaic/discussions
     about: Use Discussions for open-ended questions and design discussions.
   - name: Security report (DO NOT FILE PUBLICLY)
     url: mailto:tamimbinhakim.work@gmail.com?subject=%5Bmosaic-security%5D%20

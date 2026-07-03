@@ -11,12 +11,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tamimbinhakim/mosaic.git"
+    "url": "git+https://github.com/ruwadgroup/mosaic.git"
   },
   "bugs": {
-    "url": "https://github.com/tamimbinhakim/mosaic/issues"
+    "url": "https://github.com/ruwadgroup/mosaic/issues"
   },
-  "homepage": "https://github.com/tamimbinhakim/mosaic#readme",
+  "homepage": "https://github.com/ruwadgroup/mosaic#readme",
   "type": "module",
   "engines": {
     "node": ">=20",
