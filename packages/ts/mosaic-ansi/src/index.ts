@@ -1,4 +1,4 @@
-// @mosaic/ansi — the text/degraded renderer: the decomposeTo floor.
+// @mosaic/ansi - the text/degraded renderer: the decomposeTo floor.
 //
 // Every artifact renders to readable text: rich components decompose to
 // primitives, controls print their default state, and if the terminal offers
@@ -37,7 +37,7 @@ const TONE_CODES: Record<string, string> = {
   subtle: DIM,
 };
 
-/** The text renderer draws nothing rich natively — everything decomposes. */
+/** The text renderer draws nothing rich natively - everything decomposes. */
 const TEXT_MANIFEST: HostManifest = {
   ...DEFAULT_MANIFEST,
   interactive: false,
@@ -225,12 +225,14 @@ function lines(node: MosaicNode, ctx: Ctx): string[] {
     }
     case 'Timeline': {
       const items = Array.isArray(props.items) ? props.items : [];
-      return items.map((item) => {
+      return items.flatMap((item) => {
         const e = (
           item !== null && typeof item === 'object' && !Array.isArray(item) ? item : {}
         ) as Record<string, PropValue>;
         const dot = paint(ctx, '●', ...(toneCode(e.tone) ? [toneCode(e.tone) as string] : []));
-        return `${dot} ${paint(ctx, str(e.date), DIM)}  ${str(e.title)}`;
+        const head = `${dot} ${paint(ctx, str(e.date), DIM)}  ${str(e.title)}`;
+        const description = str(e.description);
+        return description ? [head, `  ${description}`] : [head];
       });
     }
     case 'List':

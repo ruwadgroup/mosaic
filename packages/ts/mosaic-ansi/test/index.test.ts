@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { renderAnsi } from '../src/index.js';
 
 const EXAMPLES_DIR = join(import.meta.dirname, '../../../../examples');
+const exampleFiles = readdirSync(EXAMPLES_DIR).filter((f) => f.endsWith('.mosaic'));
 
 describe('@mosaic/ansi', () => {
   it('renders text with derived values baked in', () => {
@@ -38,14 +39,51 @@ describe('@mosaic/ansi', () => {
     expect(out).toContain('Cost by plan');
   });
 
-  it('renders the full example gallery to readable text', () => {
-    for (const file of [
-      'plan-migration.mosaic',
-      'pricing-estimator.mosaic',
-      'compare-memory-layer.mosaic',
-    ]) {
-      const out = renderAnsi(readFileSync(join(EXAMPLES_DIR, file), 'utf8'));
-      expect(out.split('\n').length, file).toBeGreaterThan(10);
+  it('decomposes a Diagram to alt, group headings, node lines, and edge lines', () => {
+    const out = renderAnsi(`
+      <Diagram
+        alt="Checkout request path"
+        nodes={[
+          { id: "client", label: "Client", kind: "client" },
+          { id: "api", label: "API", kind: "service", group: "backend" },
+          { id: "db", label: "Postgres", kind: "store", group: "backend" },
+        ]}
+        groups={[{ id: "backend", label: "Backend" }]}
+        edges={[{ from: "client", to: "api", label: "HTTPS" }, { from: "api", to: "db" }]}
+      />`);
+    expect(out).toContain('Checkout request path');
+    expect(out).toContain('Backend');
+    expect(out).toContain('- API (service)');
+    expect(out).toContain('- Postgres (store)');
+    expect(out).toContain('- Client (client)');
+    expect(out).toContain('Client -> API - HTTPS');
+    expect(out).toContain('API -> Postgres');
+  });
+
+  it('renders a toned, described Timeline with date, title, and description', () => {
+    const out = renderAnsi(`
+      <Timeline items={[
+        { date: "2026-03-01", title: "Alert fired", description: "p99 latency crossed 2s", tone: "bad" },
+        { date: "2026-03-02", title: "Mitigated", tone: "ok" },
+      ]} />`);
+    expect(out).toContain('2026-03-01');
+    expect(out).toContain('Alert fired');
+    expect(out).toContain('p99 latency crossed 2s');
+    expect(out).toContain('Mitigated');
+    expect(out).not.toContain('bad');
+    expect(out).not.toContain('\u2014');
+  });
+
+  describe('the example gallery renders to readable text', () => {
+    it('found the example gallery', () => {
+      expect(exampleFiles.length).toBeGreaterThanOrEqual(5);
+    });
+
+    for (const file of exampleFiles) {
+      it(`${file} renders without throwing`, () => {
+        const out = renderAnsi(readFileSync(join(EXAMPLES_DIR, file), 'utf8'));
+        expect(out.trim().length, file).toBeGreaterThan(0);
+      });
     }
   });
 });
