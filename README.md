@@ -16,6 +16,8 @@ Mosaic is a format that lets the agent build that picture from general blocks, a
 [![GitHub stars](https://img.shields.io/github/stars/ruwadgroup/mosaic?style=flat&logo=github&label=star)](https://github.com/ruwadgroup/mosaic)
 [![Follow @TamimBinHakim](https://img.shields.io/badge/follow-%40TamimBinHakim-000000?logo=x&logoColor=white)](https://x.com/TamimBinHakim)
 
+[![You ask, the agent replies, and the reply is a live pricing estimator - every figure derived, rendered by the app's own components](.github/assets/demo.jpg)](https://trymosaic.vercel.app)
+
 </div>
 
 A migration plan is a timeline with the risks beside it.
