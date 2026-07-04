@@ -1,0 +1,85 @@
+```mosaic v=1 id=ab-test-results
+<Stack state={{ metric: "Conversion" }}>
+  {/* The experiment-readout artifact: one checkout test, three ways to score
+      it. Flip the target metric and the variant cards, the chart, the verdict,
+      and the ship button all re-derive from the same choice - including the
+      awkward truth that B wins conversion and revenue but loses retention. */}
+
+  <Stack>
+    <Heading level={2}>Experiment: one-page checkout (EXP-114)</Heading>
+    <Text tone="subtle">
+      3 weeks, 96,204 sessions split 50/50. A is the stepped checkout we run today; B collapses it to one page and makes account creation optional.
+    </Text>
+  </Stack>
+
+  <DataTable
+    columns={["Metric", "A (control)", "B (one-page)", "Delta", "p-value"]}
+    rows={[
+      ["Checkout conversion",  "6.4%",   "7.2%",   "+12.4% rel", "< 0.01"],
+      ["Revenue per visitor",  "$14.90", "$16.10", "+8.1%",      "0.03"],
+      ["D30 repeat purchase",  "41.2%",  "39.1%",  "-2.1 pp",    "0.04"]
+    ]} />
+
+  <Field label="Ship for">
+    <SegmentedControl value={metric} options={["Conversion", "Revenue", "Retention"]} />
+  </Field>
+
+  <Grid cols={12}>
+    <Card tone={metric == 'Retention' ? 'ok' : 'subtle'}>
+      <Stack direction="horizontal">
+        <Heading level={4}>A - stepped checkout</Heading>
+        {metric == 'Retention' && <Badge tone="ok" icon="trophy">winner</Badge>}
+      </Stack>
+      <Stat
+        label={metric == 'Conversion' ? 'Checkout conversion' : metric == 'Revenue' ? 'Revenue per visitor' : 'D30 repeat purchase'}
+        value={metric == 'Conversion' ? '6.4%' : metric == 'Revenue' ? '$14.90' : '41.2%'} />
+      <Text tone="subtle">48,102 sessions · forces account creation before payment</Text>
+    </Card>
+    <Card tone={metric == 'Retention' ? 'subtle' : 'ok'}>
+      <Stack direction="horizontal">
+        <Heading level={4}>B - one-page checkout</Heading>
+        {metric != 'Retention' && <Badge tone="ok" icon="trophy">winner</Badge>}
+      </Stack>
+      <Stat
+        label={metric == 'Conversion' ? 'Checkout conversion' : metric == 'Revenue' ? 'Revenue per visitor' : 'D30 repeat purchase'}
+        value={metric == 'Conversion' ? '7.2%' : metric == 'Revenue' ? '$16.10' : '39.1%'}
+        tone={metric == 'Retention' ? 'bad' : 'ok'} />
+      <Text tone="subtle">48,102 sessions · guest checkout, account optional</Text>
+    </Card>
+  </Grid>
+
+  <Chart
+    type="bar"
+    alt="The currently selected metric side by side for variant A and variant B, so the gap the verdict is based on is visible."
+    data={[
+      { label: "A (control)",  value: metric == 'Conversion' ? 6.4 : metric == 'Revenue' ? 14.9 : 41.2 },
+      { label: "B (one-page)", value: metric == 'Conversion' ? 7.2 : metric == 'Revenue' ? 16.1 : 39.1 }
+    ]} />
+
+  <Callout tone={metric == 'Retention' ? 'warn' : 'ok'} icon={metric == 'Retention' ? 'triangle-alert' : 'circle-check'}>
+    {metric == 'Conversion'
+      ? 'B lifts conversion 6.4% to 7.2% (+12.4% relative, p < 0.01) and the lift held in all three weekly cohorts. This is not noise - if conversion is the goal, ship B.'
+      : metric == 'Revenue'
+      ? 'B adds $1.20 revenue per visitor (p = 0.03). The gain is all conversion - order size is flat - so it inherits the retention caveat below the surface.'
+      : 'A wins on retention: D30 repeat purchase drops 2.1 pp under B (p = 0.04), almost certainly because guest checkout skips account creation. Shipping B trades tomorrow\'s buyers for today\'s.'}
+  </Callout>
+
+  <Stack direction="horizontal">
+    <Button
+      variant="primary"
+      icon="rocket"
+      onClick={shipVariant({
+        experiment: "EXP-114",
+        variant: metric == 'Retention' ? 'A' : 'B',
+        optimizing: metric,
+        delta: metric == 'Conversion' ? '+12.4% rel' : metric == 'Revenue' ? '+8.1%' : '+2.1 pp vs B'
+      })}>
+      {`Ship variant ${metric == 'Retention' ? 'A' : 'B'} for ${lower(metric)}`}
+    </Button>
+    <Button variant="subtle" onClick={extendExperiment({ experiment: "EXP-114", weeks: 2, reason: "let the D30 retention cohort mature" })}>
+      Run 2 more weeks
+    </Button>
+  </Stack>
+
+</Stack>
+```

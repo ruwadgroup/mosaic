@@ -1,0 +1,87 @@
+```mosaic v=1 id=expense-approval
+<Stack state={{
+    items: [
+      { id: "E-1", merchant: "United Airlines",    detail: "SFO -> ORD round trip",           category: "airfare",   amount: 412.60, flagged: false, checked: true },
+      { id: "E-2", merchant: "Hyatt Centric Loop", detail: "2 nights, Jun 16-18",             category: "lodging",   amount: 438.00, flagged: false, checked: true },
+      { id: "E-3", merchant: "RPM Steak",          detail: "client dinner, 3 people",         category: "meals",     amount: 286.40, flagged: true,  checked: true },
+      { id: "E-4", merchant: "Uber",               detail: "6 rides, airport and client HQ",  category: "transport", amount: 63.80,  flagged: false, checked: true },
+      { id: "E-5", merchant: "Hyatt minibar",      detail: "posted to the room folio",        category: "meals",     amount: 42.00,  flagged: true,  checked: false },
+      { id: "E-6", merchant: "FedEx Office",       detail: "printed proposal decks",          category: "supplies",  amount: 24.50,  flagged: false, checked: true }
+    ]
+  }}>
+  {/* The approval-inbox artifact: an expense report distilled to one decision.
+      Each line item is a checkbox over the same records the totals fold over,
+      so unticking the minibar moves the approved amount instantly, and the
+      Approve button carries the exact figure it shows. */}
+
+  <Stack direction="horizontal">
+    <Heading level={2}>Expense report - Priya Shah</Heading>
+    <Badge>Chicago client visit</Badge>
+    <Badge tone="warn">{`${items.filter(e => e.flagged).length} flagged`}</Badge>
+  </Stack>
+  <Text tone="subtle">
+    Submitted Jun 20 for the Meridian renewal trip, Jun 16-18. Policy checks ran automatically; two lines need a human call.
+  </Text>
+
+  <Grid cols={12}>
+    <Stat label="Submitted" value={formatCurrency(sum(items.map(e => e.amount)))} />
+    <Stat label="Approving" value={formatCurrency(sum(items.map(e => e.checked ? e.amount : 0)))} tone="primary" />
+    <Stat label="Held back" value={formatCurrency(sum(items.map(e => e.checked ? 0 : e.amount)))} tone={sum(items.map(e => e.checked ? 0 : e.amount)) > 0 ? 'warn' : 'subtle'} />
+  </Grid>
+
+  <Stack>
+    {items.map((e, i) => (
+      <Stack key={e.id} direction="horizontal" justify="between" align="center">
+        <Checkbox checked={items[i].checked} label={`${e.merchant} - ${e.detail}`} />
+        <Stack direction="horizontal">
+          <Tag>{e.category}</Tag>
+          {e.flagged && <Badge tone="warn" icon="flag">flagged</Badge>}
+          <Text>{formatCurrency(e.amount)}</Text>
+        </Stack>
+      </Stack>
+    ))}
+  </Stack>
+
+  <Text tone="subtle">
+    {`${items.filter(e => e.checked).length} of ${items.length} lines selected for approval`}
+  </Text>
+
+  {items.filter(e => e.flagged && e.checked).length > 0 && (
+    <Callout tone="warn" icon="flag">
+      {`You are approving ${items.filter(e => e.flagged && e.checked).length} flagged line(s) worth ${formatCurrency(sum(items.map(e => e.flagged && e.checked ? e.amount : 0)))}. The RPM Steak dinner runs $95 a head against the $75 meal cap; the minibar is never reimbursable under travel policy 4.2.`}
+    </Callout>
+  )}
+
+  <Stack direction="horizontal">
+    <Button
+      variant="primary"
+      icon="circle-check"
+      onClick={approveExpenses({
+        report: "Priya Shah - Jun 20",
+        count: items.filter(e => e.checked).length,
+        total: sum(items.map(e => e.checked ? e.amount : 0)),
+        flaggedApproved: items.filter(e => e.flagged && e.checked).length
+      })}>
+      {`Approve ${items.filter(e => e.checked).length} items - ${formatCurrency(sum(items.map(e => e.checked ? e.amount : 0)))}`}
+    </Button>
+    <Button
+      icon="undo-2"
+      onClick={returnFlagged({
+        report: "Priya Shah - Jun 20",
+        ids: items.filter(e => e.flagged).map(e => e.id),
+        note: "meal cap and minibar policy"
+      })}>
+      Send flags back to Priya
+    </Button>
+    <Button
+      variant="danger"
+      onClick={rejectReport({
+        report: "Priya Shah - Jun 20",
+        total: sum(items.map(e => e.amount))
+      })}>
+      Reject report
+    </Button>
+  </Stack>
+
+</Stack>
+```

@@ -1,5 +1,4 @@
-# Demo app and local spec workflow (not committed yet)
-demo/
+# Local spec workflow
 .agents/
 
 # Node / TypeScript

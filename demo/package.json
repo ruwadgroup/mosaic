@@ -1,0 +1,35 @@
+{
+  "name": "@mosaicjs/demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The example gallery as a chat: Mosaic artifacts rendered live by @mosaicjs/react in a Next.js app.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.5.0",
+    "@mosaicjs/core": "workspace:*",
+    "@mosaicjs/react": "workspace:*",
+    "class-variance-authority": "0.7.1",
+    "gsap": "^3.15.0",
+    "lucide-react": "0.564.0",
+    "motion": "12.42.0",
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "sonner": "2.0.7",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

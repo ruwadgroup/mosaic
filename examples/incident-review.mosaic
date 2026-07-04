@@ -1,0 +1,87 @@
+```mosaic v=1 id=incident-review
+<Stack state={{
+    area: "all",
+    actions: [
+      { id: "AI-1", title: "Page on pool saturation at 80%, not on error rate", area: "observability", owner: "@mei", checked: true },
+      { id: "AI-2", title: "Cap pgbouncer connection ramp during deploys",      area: "infra",         owner: "@tom", checked: true },
+      { id: "AI-3", title: "Retry with jitter on checkout -> payments calls",   area: "code",          owner: "@ana", checked: true },
+      { id: "AI-4", title: "Runbook: shed read traffic without dropping carts", area: "process",       owner: "@tom", checked: false },
+      { id: "AI-5", title: "Replay the deploy-time load profile in staging",    area: "infra",         owner: "@mei", checked: false }
+    ]
+  }}>
+  {/* The post-incident artifact: one SEV-1, fully digested. The phases are a
+      Timeline, the blast radius is a Stat row, and the action items are a
+      live checklist - filter by area, tick what actually gets filed, and the
+      button's count and ids fold over the same array. */}
+
+  <Stack direction="horizontal">
+    <Heading level={2}>INC-2043 - checkout API outage</Heading>
+    <Badge tone="bad">SEV-1</Badge>
+    <Badge tone="ok">resolved</Badge>
+  </Stack>
+  <Text tone="subtle">
+    Jun 24, 14:02-14:45 UTC. The 14:00 deploy tripled connection churn and exhausted the pgbouncer pool; checkout returned 503s until writes were shed to the replica.
+  </Text>
+
+  <Grid cols={12}>
+    <Stat label="User-facing impact" value="43 min" tone="bad" />
+    <Stat label="Failed checkouts" value={formatNumber(3120)} tone="bad" />
+    <Stat label="Peak error rate" value="62%" tone="warn" />
+    <Stat label="Est. revenue at risk" value={formatCurrency(18400)} />
+  </Grid>
+
+  <Timeline items={[
+    { date: "14:02", title: "Checkout error rate crosses 5%",            description: "First 503s from the payments path; no page fired.", tone: "bad"  },
+    { date: "14:11", title: "On-call paged by a customer report",        description: "9 minutes late - alerting keyed on latency, not saturation.", tone: "warn" },
+    { date: "14:27", title: "Root cause found: pool exhausted",          description: "The 14:00 deploy tripled connection churn under pgbouncer.", tone: "warn" },
+    { date: "14:45", title: "Mitigated - reads shed to replica",         description: "Error rate back under 1%; carts recovered from the queue.", tone: "ok"   },
+    { date: "15:20", title: "Deploy rolled forward with a pool cap",     description: "Config fix verified against the replayed traffic.", tone: "ok"   }
+  ]} />
+
+  <Divider />
+
+  <Stack direction="horizontal" justify="between" align="center">
+    <Heading level={3}>Action items</Heading>
+    <Field label="Filter by area">
+      <Select value={area} options={["all", "infra", "code", "observability", "process"]} />
+    </Field>
+  </Stack>
+
+  <Stack>
+    {actions.map((a, i) => (area == 'all' || a.area == area) && (
+      <Stack key={a.id} direction="horizontal">
+        <Checkbox checked={actions[i].checked} label={`${a.id} · ${a.title}`} />
+        <Badge tone={a.area == 'process' ? 'subtle' : 'primary'}>{a.area}</Badge>
+        <Text tone="subtle">{a.owner}</Text>
+      </Stack>
+    ))}
+  </Stack>
+
+  <Text tone="subtle">
+    {`${actions.filter(a => a.checked).length} of ${actions.length} ticked for follow-up`}
+  </Text>
+
+  {!actions[0].checked && (
+    <Callout tone="warn" icon="triangle-alert">
+      AI-1 is the one that turns the next pool exhaustion from 9 silent minutes into a page. Skipping it means we find out from customers again.
+    </Callout>
+  )}
+
+  <Stack direction="horizontal">
+    <Button
+      variant="primary"
+      icon="clipboard-list"
+      onClick={fileFollowups({
+        incident: "INC-2043",
+        count: actions.filter(a => a.checked).length,
+        ids: actions.filter(a => a.checked).map(a => a.id)
+      })}>
+      {`File ${actions.filter(a => a.checked).length} follow-ups`}
+    </Button>
+    <Button variant="subtle" icon="send" onClick={sharePostmortem({ incident: "INC-2043", channel: "#eng-incidents" })}>
+      Share post-review
+    </Button>
+  </Stack>
+
+</Stack>
+```

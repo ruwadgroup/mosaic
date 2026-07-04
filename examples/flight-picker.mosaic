@@ -1,0 +1,102 @@
+```mosaic v=1 id=flight-picker
+<Stack state={{
+    nonstopOnly: false,
+    maxPrice: 360,
+    bag: true,
+    selected: "B6-616",
+    flights: [
+      { id: "UA-1512", airline: "United",   depart: "6:05a",  arrive: "2:40p", duration: "8h 35m", stops: 1, price: 248 },
+      { id: "B6-616",  airline: "JetBlue",  depart: "8:15a",  arrive: "4:59p", duration: "5h 44m", stops: 0, price: 317 },
+      { id: "AA-190",  airline: "American", depart: "9:20p",  arrive: "6:01a", duration: "5h 41m", stops: 0, price: 289 },
+      { id: "DL-424",  airline: "Delta",    depart: "11:30a", arrive: "8:12p", duration: "5h 42m", stops: 0, price: 342 }
+    ]
+  }}>
+  {/* The booking-screen mock: four real options, two filters, one decision.
+      The card list is a live filter over baked-in flights, the best-value
+      callout re-sorts whatever survives the filters, and the Book button
+      quotes the exact selected flight plus the bag fee. */}
+
+  <Stack>
+    <Heading level={2}>SFO -> JFK · Fri Jul 10 · 1 adult</Heading>
+    <Text tone="subtle">One-way, economy. Prices held from this morning's fare cache; the red-eye is cheapest of the nonstops.</Text>
+  </Stack>
+
+  <Card>
+    <Stack direction="horizontal">
+      <Toggle checked={nonstopOnly} label="Nonstop only" />
+      <Toggle checked={bag} label="Checked bag (+$35)" />
+    </Stack>
+    <Field label={`Max price: ${formatCurrency(maxPrice)}`}>
+      <Slider value={maxPrice} min={240} max={400} step={5} />
+    </Field>
+    <Text tone="subtle">
+      {`${flights.filter(f => (!nonstopOnly || f.stops == 0) && f.price <= maxPrice).length} of ${flights.length} flights match`}
+    </Text>
+  </Card>
+
+  {flights.filter(f => (!nonstopOnly || f.stops == 0) && f.price <= maxPrice).length > 0 && (
+    <Callout tone="ok" icon="sparkles">
+      {`Best value in view: ${sortBy(flights.filter(f => (!nonstopOnly || f.stops == 0) && f.price <= maxPrice), f => f.price)[0].airline} ${sortBy(flights.filter(f => (!nonstopOnly || f.stops == 0) && f.price <= maxPrice), f => f.price)[0].id} at ${formatCurrency(sortBy(flights.filter(f => (!nonstopOnly || f.stops == 0) && f.price <= maxPrice), f => f.price)[0].price)}.`}
+    </Callout>
+  )}
+  {flights.filter(f => (!nonstopOnly || f.stops == 0) && f.price <= maxPrice).length == 0 && (
+    <Callout tone="warn" icon="triangle-alert">
+      Nothing matches these filters. Raise the price cap or allow one stop.
+    </Callout>
+  )}
+
+  <List>
+    {flights.map((f) => (!nonstopOnly || f.stops == 0) && f.price <= maxPrice && (
+      <Card key={f.id}>
+        <Stack direction="horizontal" justify="between" align="center">
+          <Stack>
+            <Stack direction="horizontal">
+              <Text variant="label">{`${f.airline} ${f.id}`}</Text>
+              {selected == f.id && <Badge tone="primary" icon="circle-check">selected</Badge>}
+              {f.stops == 0 ? <Tag>nonstop</Tag> : <Tag>1 stop, DEN</Tag>}
+            </Stack>
+            <Text tone="subtle">{`${f.depart} -> ${f.arrive} · ${f.duration}`}</Text>
+          </Stack>
+          <Stack direction="horizontal" align="center">
+            <Text>{formatCurrency(f.price)}</Text>
+            <Button variant={selected == f.id ? "primary" : "secondary"} onClick={set(selected, f.id)}>
+              {selected == f.id ? "Selected" : "Select"}
+            </Button>
+          </Stack>
+        </Stack>
+      </Card>
+    ))}
+  </List>
+
+  {selected == "AA-190" && (
+    <Callout tone="warn" icon="moon">
+      AA-190 is a red-eye: it lands at 6:01a the next morning. Cheapest nonstop, but budget the lost night.
+    </Callout>
+  )}
+
+  <Stack direction="horizontal" justify="between" align="center">
+    <Stat
+      label={bag ? "Total with checked bag" : "Total, no checked bag"}
+      value={formatCurrency(flights.filter(f => f.id == selected)[0].price + (bag ? 35 : 0))}
+      tone="primary" />
+    <Stack direction="horizontal">
+      <Button
+        variant="primary"
+        icon="plane"
+        onClick={bookFlight({
+          flight: selected,
+          route: "SFO-JFK",
+          date: "Jul 10",
+          bag: bag,
+          total: flights.filter(f => f.id == selected)[0].price + (bag ? 35 : 0)
+        })}>
+        {`Book ${selected} - ${formatCurrency(flights.filter(f => f.id == selected)[0].price + (bag ? 35 : 0))}`}
+      </Button>
+      <Button variant="subtle" icon="bell" onClick={trackPrices({ route: "SFO-JFK", date: "Jul 10", cap: maxPrice })}>
+        Watch fares instead
+      </Button>
+    </Stack>
+  </Stack>
+
+</Stack>
+```
