@@ -2,7 +2,7 @@
   "name": "@mosaicjs/demo",
   "version": "0.1.0",
   "private": true,
-  "description": "The example gallery as a chat: Mosaic artifacts rendered live by @mosaicjs/react in a Next.js app.",
+  "description": "The Mosaic demo site: examples streamed and rendered live by @mosaicjs/react in a Next.js app.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@base-ui/react": "1.5.0",
-    "@mosaicjs/core": "workspace:*",
-    "@mosaicjs/react": "workspace:*",
+    "@mosaicjs/core": "^0.8.0",
+    "@mosaicjs/react": "^0.8.0",
     "class-variance-authority": "0.7.1",
     "gsap": "^3.15.0",
     "lucide-react": "0.564.0",

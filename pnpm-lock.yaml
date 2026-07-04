@@ -36,11 +36,11 @@ importers:
         specifier: 1.5.0
         version: 1.5.0(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@mosaicjs/core':
-        specifier: workspace:*
-        version: link:../packages/ts/mosaic-core
+        specifier: ^0.8.0
+        version: 0.8.0
       '@mosaicjs/react':
-        specifier: workspace:*
-        version: link:../packages/ts/mosaic-react
+        specifier: ^0.8.0
+        version: 0.8.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -860,6 +860,15 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@mosaicjs/core@0.8.0':
+    resolution: {integrity: sha512-SBRGqpPZXx/jykvqmFLIijHE3zlFMBccxO9Y7L8JXaTp0mHFVBEFl48+8e3G1EMU7tc4qaHw4eDPPVczJ9zHjQ==}
+
+  '@mosaicjs/react@0.8.0':
+    resolution: {integrity: sha512-fUojvmTWoO6Pn5mr6W6IRFPdkFmVnaVw9ZaMITqVL64wgnAVLkNAJ5jmGaXY8nzvaA8YL5vTxKolr0jPz0my9g==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
 
   '@next/env@16.2.10':
     resolution: {integrity: sha512-zLPxg9M0MEHmygpj5OuxjQ+vHMiy/K7cSp74G8ecYolmgUWw0RwN02tF56npup/+qaI8JB97hQgS/r2Hb6QwVA==}
@@ -3429,6 +3438,14 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
+
+  '@mosaicjs/core@0.8.0': {}
+
+  '@mosaicjs/react@0.8.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@mosaicjs/core': 0.8.0
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
 
   '@next/env@16.2.10': {}
 
