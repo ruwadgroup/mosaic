@@ -7,6 +7,8 @@
 **Many of what you ask an agent for is really a picture.
 Mosaic is a format that lets the agent build that picture from general blocks, and lets your app render it as native UI in your own look.**
 
+**[Try it live → trymosaic.vercel.app](https://trymosaic.vercel.app)**
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Proposal](https://img.shields.io/badge/proposal-founding-7c7cff.svg)](docs/proposal.md)
 [![mosaic_version](https://img.shields.io/badge/mosaic__version-1.0--draft-7c7cff.svg)](docs/proposal.md)
@@ -138,12 +140,17 @@ The artifact travels inline - a ```` ```mosaic ```` fence in the model's reply t
 
 ## Try it
 
+**[trymosaic.vercel.app](https://trymosaic.vercel.app)** - no install.
+Pick a demo and watch the reply stream in as a live interface: the ask, the answer, the artifact building line by line, and then it's yours to drag, filter, and click.
+
+Or run it locally:
+
 ```bash
 pnpm install && pnpm build && pnpm demo
 ```
 
-That opens the [demo](demo/): a full agent workspace where every reply is a live Mosaic, rendered by the app's own components.
-The threads are real jobs, reviewing a diff, approving a command, picking a model, reading test results, and everything does something: sliders drive totals, filters reshape lists, buttons hand your app the numbers they computed.
+That opens the same [demo site](demo/), where every artifact is rendered by the app's own components.
+The demos are real jobs, reviewing a diff, approving an expense report, picking a flight, reading test results, and everything does something: sliders drive totals, filters reshape lists, buttons hand your app the numbers they computed.
 
 If you'd rather read than run, [`examples/`](examples) has the hand-written files, one per job an agent actually does:
 

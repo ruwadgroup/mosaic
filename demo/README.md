@@ -9,6 +9,8 @@ When the stream finishes the artifact is simply live: move a slider and totals r
 
 ## Run it
 
+Live at **<https://trymosaic.vercel.app>**, or locally:
+
 ```bash
 pnpm install && pnpm build && pnpm demo
 ```
