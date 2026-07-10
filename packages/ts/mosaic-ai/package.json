@@ -58,8 +58,8 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "ai": "^6.0.219",
-    "zod": "^3.25.0"
+    "ai": "^7.0.19",
+    "zod": "^4.4.3"
   },
   "publishConfig": {
     "access": "public"
