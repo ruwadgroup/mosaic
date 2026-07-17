@@ -36,12 +36,12 @@
     "gen": "node scripts/gen-block-types.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@changesets/cli": "^2.27.9",
-    "@types/node": "^22.7.5",
-    "lefthook": "^1.7.18",
+    "@biomejs/biome": "^2.5.4",
+    "@changesets/cli": "^2.31.1",
+    "@types/node": "^26.1.1",
+    "lefthook": "^2.1.10",
     "tsup": "^8.3.0",
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
